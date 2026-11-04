@@ -58,15 +58,15 @@ async function flush() {
     .filter(Boolean)
     .map((inv) => ({ id: inv.id, number: inv.number, data: inv, updated_at: inv.updatedAt || new Date().toISOString() }));
   if (rows.length) {
-    const { error } = await supabase.from('invoices').upsert(rows);
+    const { error } = await supabase.from('cybervex_invoices').upsert(rows);
     if (error) throw error;
   }
   if (q.deleted.length) {
-    const { error } = await supabase.from('invoices').delete().in('id', q.deleted);
+    const { error } = await supabase.from('cybervex_invoices').delete().in('id', q.deleted);
     if (error) throw error;
   }
   if (q.settings) {
-    const { error } = await supabase.from('settings')
+    const { error } = await supabase.from('cybervex_settings')
       .upsert({ user_id: auth.session.user.id, data: settings, updated_at: new Date().toISOString() });
     if (error) throw error;
   }
@@ -87,8 +87,8 @@ async function flush() {
 
 async function pull() {
   const [inv, set] = await Promise.all([
-    supabase.from('invoices').select('data').order('updated_at', { ascending: false }),
-    supabase.from('settings').select('data').maybeSingle(),
+    supabase.from('cybervex_invoices').select('data').order('updated_at', { ascending: false }),
+    supabase.from('cybervex_settings').select('data').maybeSingle(),
   ]);
   if (inv.error) throw inv.error;
   if (set.error) throw set.error;
@@ -129,7 +129,7 @@ export function syncNow() {
 
 function friendly(e) {
   const msg = e?.message ?? String(e);
-  if (/invoices_user_number_key|duplicate key/i.test(msg)) {
+  if (/cybervex_invoices_user_number_key|duplicate key/i.test(msg)) {
     return 'An invoice number is already used by another invoice in your account. Change it and save again.';
   }
   if (/fetch|network/i.test(msg)) return 'Could not reach the server. Changes are kept on this device.';

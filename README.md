@@ -55,7 +55,7 @@ The first sign-in on a browser uploads the invoices already stored there.
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. **SQL Editor → New query**: paste [`supabase/schema.sql`](supabase/schema.sql) and run it.
-   It creates the `invoices` and `settings` tables with Row Level Security, so each account only
+   It creates the `cybervex_invoices` and `cybervex_settings` tables with Row Level Security, so each account only
    sees its own data.
 3. **Authentication → Sign In / Providers → Email**: turn **off** "Allow new users to sign up".
    Then **Authentication → Users → Add user** to create each login (email + password, auto-confirm).
