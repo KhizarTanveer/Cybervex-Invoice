@@ -1,0 +1,256 @@
+import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
+
+// Vector PDF (selectable text) mirroring InvoiceDocument. Units are points; 1mm ≈ 2.835pt.
+const MM = 2.835;
+const BASE = import.meta.env.BASE_URL;
+const asset = (p) => new URL(`${BASE}${p}`, window.location.origin).href;
+
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: asset('fonts/Inter-Regular.ttf'), fontWeight: 400 },
+    { src: asset('fonts/Inter-Medium.ttf'), fontWeight: 500 },
+    { src: asset('fonts/Inter-SemiBold.ttf'), fontWeight: 600 },
+    { src: asset('fonts/Inter-Bold.ttf'), fontWeight: 700 },
+  ],
+});
+// Never hyphenate names, emails or IBANs.
+Font.registerHyphenationCallback((word) => [word]);
+
+const INK = '#0a0a0a';
+const BODY = '#2b2b2b';
+const MUTED = '#7a7a7a';
+const LINE = '#e4e4e4';
+const PH = '#a3a3a3';
+
+const label = {
+  fontSize: 6.75,
+  fontWeight: 600,
+  letterSpacing: 1.1,
+  textTransform: 'uppercase',
+  color: MUTED,
+  marginBottom: 2.2 * MM,
+};
+
+const s = StyleSheet.create({
+  page: {
+    fontFamily: 'Inter',
+    fontSize: 8.75,
+    lineHeight: 1.45,
+    color: BODY,
+    paddingTop: 15 * MM,
+    paddingBottom: 20 * MM,
+    paddingHorizontal: 18 * MM,
+  },
+  label,
+  head: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingBottom: 7 * MM,
+    borderBottomWidth: 1,
+    borderBottomColor: INK,
+  },
+  logo: { height: 11 * MM, marginTop: 1 * MM, objectFit: 'contain' },
+  titleBox: { alignItems: 'flex-end' },
+  title: { fontSize: 26, lineHeight: 1, fontWeight: 600, letterSpacing: 3.6, color: INK },
+  number: { marginTop: 3 * MM, fontSize: 9, fontWeight: 500, letterSpacing: 0.5, color: INK },
+  status: {
+    marginTop: 2.5 * MM,
+    paddingTop: 1 * MM,
+    paddingBottom: 0.7 * MM,
+    paddingHorizontal: 2.2 * MM,
+    borderWidth: 1,
+    borderColor: INK,
+  },
+  statusText: {
+    fontSize: 6.5,
+    lineHeight: 1,
+    fontWeight: 600,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: INK,
+  },
+  parties: { flexDirection: 'row', paddingTop: 7 * MM, paddingBottom: 6 * MM },
+  party: { flex: 1 },
+  partyName: { fontSize: 10, fontWeight: 600, color: INK, marginBottom: 1 * MM },
+  grid: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: LINE },
+  cell: { flex: 1, paddingVertical: 3 * MM, paddingRight: 4 * MM },
+  cellNext: { paddingLeft: 4 * MM, borderLeftWidth: 1, borderLeftColor: LINE },
+  cellLabel: { ...label, marginBottom: 1 * MM },
+  cellValue: { color: INK, fontWeight: 500 },
+  svcHead: {
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    borderBottomWidth: 1,
+    borderBottomColor: INK,
+    paddingTop: 4 * MM,
+    paddingBottom: 2 * MM,
+  },
+  th: { ...label, marginBottom: 0 },
+  svcRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 2.6 * MM,
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
+  },
+  bullet: { width: 4, height: 4, borderRadius: 2, backgroundColor: INK, marginTop: 4.6, marginLeft: 1.7, marginRight: 9 },
+  svcText: { flex: 1, color: INK, fontWeight: 500 },
+  summary: { marginTop: 5 * MM, marginLeft: 'auto', width: 82 * MM },
+  sumRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1.5 * MM },
+  sumValue: { color: INK },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    paddingTop: 2 * MM,
+    marginTop: 0.5 * MM,
+    marginBottom: 1.5 * MM,
+  },
+  totalText: { fontWeight: 600, color: INK },
+  due: {
+    marginTop: 1.5 * MM,
+    backgroundColor: INK,
+    paddingVertical: 3.6 * MM,
+    paddingHorizontal: 5 * MM,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dueLabel: { color: '#fff', lineHeight: 1, fontSize: 7, fontWeight: 600, letterSpacing: 1.3, textTransform: 'uppercase' },
+  dueValue: { color: '#fff', lineHeight: 1, fontSize: 15, fontWeight: 600 },
+  bottom: {
+    flexDirection: 'row',
+    marginTop: 8 * MM,
+    paddingTop: 5 * MM,
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+  },
+  bottomCol: { flex: 1 },
+  gap: { marginTop: 2 * MM },
+  foot: {
+    position: 'absolute',
+    left: 18 * MM,
+    right: 18 * MM,
+    bottom: 10 * MM,
+    fontSize: 7,
+    letterSpacing: 0.85,
+    textTransform: 'uppercase',
+    color: MUTED,
+  },
+});
+
+const P = ({ part, style }) => (
+  <Text style={[style, part.placeholder ? { color: PH } : null]}>{part.text}</Text>
+);
+
+function Party({ title, lines, style }) {
+  return (
+    <View style={[s.party, style]}>
+      <Text style={s.label}>{title}</Text>
+      {lines.map((l, i) => <P key={i} part={l} style={l.strong ? s.partyName : null} />)}
+    </View>
+  );
+}
+
+function Grid({ cells }) {
+  return (
+    <View style={s.grid} wrap={false}>
+      {cells.map((m, i) => (
+        <View key={m.label} style={[s.cell, i > 0 ? s.cellNext : null]}>
+          <Text style={s.cellLabel}>{m.label}</Text>
+          <P part={m} style={s.cellValue} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function InvoicePdfDocument({ view }) {
+  const statusBox = view.status === 'paid'
+    ? { backgroundColor: INK }
+    : view.status === 'draft' || view.status === 'void' ? { borderStyle: 'dashed', borderColor: MUTED } : null;
+  const statusColor = view.status === 'paid' ? { color: '#fff' }
+    : view.status === 'draft' || view.status === 'void' ? { color: MUTED } : null;
+  return (
+    <Document title={`Invoice ${view.number}`} author={view.brandName} creator={view.brandName} producer={view.brandName}>
+      <Page size="A4" style={s.page}>
+        <View style={s.head}>
+          <Image style={s.logo} src={asset(`brand/cybervex-logo-${view.logoVariant}.png`)} />
+          <View style={s.titleBox}>
+            <Text style={s.title}>INVOICE</Text>
+            <Text style={s.number}>{view.number}</Text>
+            {view.showStatus && (
+              <View style={[s.status, statusBox]}>
+                <Text style={[s.statusText, statusColor]}>{view.statusLabel}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={s.parties}>
+          <Party title="Billed from" lines={view.fromLines} style={{ marginRight: 6 * MM }} />
+          <Party title="Billed to" lines={view.toLines} style={{ marginLeft: 6 * MM }} />
+        </View>
+
+        <Grid cells={view.meta} />
+        {view.reference.length > 0 && <Grid cells={view.reference} />}
+
+        <View style={s.svcHead} minPresenceAhead={40}>
+          <Text style={s.th}>Services</Text>
+        </View>
+        {view.services.map((sv) => (
+          <View key={sv.id} style={s.svcRow} wrap={false}>
+            <View style={s.bullet} />
+            <P part={sv} style={s.svcText} />
+          </View>
+        ))}
+
+        <View style={s.summary} wrap={false}>
+          {view.summary.map((r) => (
+            <View key={r.label} style={s.sumRow}>
+              <Text>{r.label}</Text>
+              <Text style={s.sumValue}>{r.value}</Text>
+            </View>
+          ))}
+          <View style={s.totalRow}>
+            <Text style={s.totalText}>{view.total.label}</Text>
+            <Text style={s.totalText}>{view.total.value}</Text>
+          </View>
+          {view.after.map((r) => (
+            <View key={r.label} style={s.sumRow}>
+              <Text>{r.label}</Text>
+              <Text style={s.sumValue}>{r.value}</Text>
+            </View>
+          ))}
+          <View style={s.due}>
+            <Text style={s.dueLabel}>{view.due.label}</Text>
+            <Text style={s.dueValue}>{view.due.value}</Text>
+          </View>
+        </View>
+
+        <View style={s.bottom} wrap={false}>
+          <View style={[s.bottomCol, { marginRight: 6 * MM }]}>
+            <Text style={s.label}>Payment details</Text>
+            {view.paymentDetails.map((l, i) => <P key={i} part={l} />)}
+            {view.paymentInstructions ? <Text style={s.gap}>{view.paymentInstructions}</Text> : null}
+          </View>
+          <View style={[s.bottomCol, { marginLeft: 6 * MM }]}>
+            <Text style={s.label}>Notes &amp; terms</Text>
+            {view.termsLine ? <Text>{view.termsLine}</Text> : null}
+            {view.notes ? <Text style={s.gap}>{view.notes}</Text> : null}
+          </View>
+        </View>
+
+        <Text style={[s.foot, { textAlign: 'left' }]} fixed>{view.tagline}</Text>
+        <Text style={[s.foot, { textAlign: 'right' }]} fixed>{view.website}</Text>
+      </Page>
+    </Document>
+  );
+}
+
+export async function renderInvoicePdf(view) {
+  return pdf(<InvoicePdfDocument view={view} />).toBlob();
+}

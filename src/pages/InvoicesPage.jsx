@@ -1,0 +1,172 @@
+import { useMemo, useState } from 'react';
+import { ChevronRight, Plus, Search } from 'lucide-react';
+import { computeTotals } from '../lib/calc';
+import { formatDate, todayISO } from '../lib/dates';
+import { formatMoney } from '../lib/money';
+import { navigate } from '../lib/router';
+import { STATUS, deriveStatus } from '../lib/status';
+import { useStore } from '../lib/storage';
+import { StatusBadge } from '../components/ui';
+
+const FILTERS = ['all', 'draft', 'unpaid', 'partial', 'overdue', 'paid', 'void'];
+const FILTER_LABEL = { all: 'All', ...Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label])) };
+
+/** Sum per currency: invoices in different currencies are never added together. */
+function byCurrency(rows, pick) {
+  const m = new Map();
+  for (const r of rows) {
+    const v = pick(r);
+    if (v > 0) m.set(r.inv.currency, (m.get(r.inv.currency) ?? 0) + v);
+  }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function MoneyList({ entries }) {
+  if (!entries.length) return <>—</>;
+  const [first, ...rest] = entries;
+  return (
+    <>
+      {formatMoney(first[1], first[0])}
+      {rest.map(([c, v]) => <small key={c}>{formatMoney(v, c)}</small>)}
+    </>
+  );
+}
+
+export default function InvoicesPage() {
+  const { invoices } = useStore();
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const rows = useMemo(() => {
+    const today = todayISO();
+    return invoices
+      .map((inv) => {
+        const totals = computeTotals(inv);
+        return { inv, totals, status: deriveStatus(inv, totals, today) };
+      })
+      .sort((a, b) => (b.inv.issueDate || '').localeCompare(a.inv.issueDate || '')
+        || (b.inv.number || '').localeCompare(a.inv.number || ''));
+  }, [invoices]);
+
+  const counts = useMemo(() => {
+    const c = { all: rows.length };
+    for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
+    return c;
+  }, [rows]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (filter !== 'all' && r.status !== filter) return false;
+      if (!q) return true;
+      const { inv } = r;
+      return [inv.number, inv.to?.company, inv.to?.contact, inv.to?.email, inv.reference,
+        ...(inv.services ?? []).map((sv) => sv.name)]
+        .some((v) => v?.toLowerCase().includes(q));
+    });
+  }, [rows, query, filter]);
+
+  const open = rows.filter((r) => ['unpaid', 'partial', 'overdue'].includes(r.status));
+  const outstanding = byCurrency(open, (r) => r.totals.balance);
+  const overdue = byCurrency(rows.filter((r) => r.status === 'overdue'), (r) => r.totals.balance);
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Cybervex Digital</p>
+          <h1>Invoices</h1>
+        </div>
+      </div>
+
+      <section className="stats" aria-label="Summary">
+        <div className="stat">
+          <p className="eyebrow">Outstanding</p>
+          <p className="stat-value"><MoneyList entries={outstanding} /></p>
+        </div>
+        <div className="stat">
+          <p className="eyebrow">Overdue · {counts.overdue ?? 0}</p>
+          <p className="stat-value"><MoneyList entries={overdue} /></p>
+        </div>
+        <div className="stat">
+          <p className="eyebrow">Drafts</p>
+          <p className="stat-value">{counts.draft ?? 0}</p>
+        </div>
+      </section>
+
+      <div className="toolbar">
+        <label className="search">
+          <Search aria-hidden />
+          <span className="visually-hidden">Search invoices</span>
+          <input
+            type="search"
+            placeholder="Search number, client, project…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+        <div className="chips" role="group" aria-label="Filter by status">
+          {FILTERS.filter((f) => f === 'all' || counts[f]).map((f) => (
+            <button key={f} type="button" className="chip" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+              {FILTER_LABEL[f]}<span className="count">{counts[f] ?? 0}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="list" role="table" aria-label="Invoice history">
+        <div className="list-row list-head" role="row">
+          <span role="columnheader">Number</span>
+          <span role="columnheader">Client</span>
+          <span role="columnheader">Issued</span>
+          <span role="columnheader">Due</span>
+          <span role="columnheader" className="num">Total</span>
+          <span role="columnheader" className="num">Balance</span>
+          <span role="columnheader">Status</span>
+          <span />
+        </div>
+
+        {visible.map(({ inv, totals, status }) => (
+          <a
+            key={inv.id}
+            role="row"
+            className="list-row"
+            href={`#/invoice/${inv.id}`}
+            onClick={(e) => { e.preventDefault(); navigate(`/invoice/${inv.id}`); }}
+          >
+            <span role="cell" className="strong">{inv.number}</span>
+            <span role="cell" className="clip">
+              <span className="strong">{inv.to?.company || 'Untitled client'}</span>
+              {inv.services?.some((sv) => sv.name?.trim()) && (
+                <span className="sub"> · {inv.services.map((sv) => sv.name?.trim()).filter(Boolean).join(', ')}</span>
+              )}
+            </span>
+            <span role="cell" className="muted small">
+              <span className="mobile-label">Issued</span>{formatDate(inv.issueDate)}
+            </span>
+            <span role="cell" className="muted small">{formatDate(inv.dueDate)}</span>
+            <span role="cell" className="num strong">{formatMoney(totals.total, inv.currency)}</span>
+            <span role="cell" className="num muted">
+              <span className="mobile-label">Balance</span>{formatMoney(Math.max(totals.balance, 0), inv.currency)}
+            </span>
+            <span role="cell"><StatusBadge status={status} /></span>
+            <span role="cell" className="muted"><ChevronRight size={16} aria-hidden /></span>
+          </a>
+        ))}
+
+        {rows.length === 0 && (
+          <div className="empty">
+            <h2>No invoices yet</h2>
+            <p>Create your first Cybervex Digital invoice. Drafts are saved in this browser.</p>
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/new')}>
+              <Plus aria-hidden /> New invoice
+            </button>
+          </div>
+        )}
+        {rows.length > 0 && visible.length === 0 && (
+          <div className="empty"><p>No invoices match your search.</p></div>
+        )}
+      </div>
+    </div>
+  );
+}
