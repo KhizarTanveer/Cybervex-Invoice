@@ -176,6 +176,14 @@ describe('pending payments', () => {
     expect(pendingPayment(paid, computeTotals(paid))).toMatchObject({ kind: 'balance', label: 'Balance', amount: 600, date: '2026-12-01' });
   });
 
+  it('titles the document as an invoice or a quotation', async () => {
+    const { buildView } = await import('./view');
+    const base = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'draft', discount: { type: 'percent', value: '' }, payments: [] };
+    expect(buildView(base, {}).title).toBe('Invoice');
+    expect(buildView({ ...base, kind: 'quotation' }, {}).title).toBe('Quotation');
+    expect(buildView({ ...base, kind: 'quotation' }, {}, undefined, { balance: true }).title).toBe('Invoice');
+  });
+
   it('builds a balance invoice that deducts the advance', async () => {
     const { buildView } = await import('./view');
     const base = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'issued', dueDate: '2999-01-01', discount: { type: 'percent', value: '' }, advance: { enabled: true, percent: '50', when: 'receipt' }, payments: [{ id: 'p', amount: '500' }] };

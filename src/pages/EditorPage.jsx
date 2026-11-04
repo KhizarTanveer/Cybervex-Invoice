@@ -233,7 +233,7 @@ export default function EditorPage({ id }) {
     try {
       const { renderInvoicePdf } = await import('../components/InvoicePdf');
       const blob = await renderInvoicePdf(balance ? buildView(draft, settings, undefined, { balance: true }) : view);
-      saveBlob(blob, [draft.number, balance && 'Balance', draft.to.company].filter(Boolean).join(' - '));
+      saveBlob(blob, [draft.number, balance ? 'Balance' : draft.kind === 'quotation' && 'Quotation', draft.to.company].filter(Boolean).join(' - '));
     } catch (e) {
       console.error(e);
       toast('Could not create the PDF. Please try again.', 'error');
@@ -326,6 +326,11 @@ export default function EditorPage({ id }) {
 
           <section className="section">
             <div className="section-head"><h2>Invoice</h2></div>
+            <div className="chips adv-presets" role="group" aria-label="Document type">
+              {[['invoice', 'Invoice'], ['quotation', 'Quotation']].map(([k, label]) => (
+                <button key={k} type="button" className="chip" aria-pressed={(draft.kind ?? 'invoice') === k} onClick={() => setField('kind', k)}>{label}</button>
+              ))}
+            </div>
             <div className="grid grid-2">
               <Field
                 label="Invoice number"

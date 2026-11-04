@@ -52,7 +52,7 @@ function Schedule({ stages }) {
 /** The A4 invoice as HTML. Takes a view model from buildView(). */
 export default function InvoiceDocument({ view }) {
   return (
-    <article className="iv" aria-label={`Invoice ${view.number}`}>
+    <article className="iv" aria-label={`${view.title} ${view.number}`}>
       <header className="iv-head">
         <img
           className="iv-logo"
@@ -60,7 +60,7 @@ export default function InvoiceDocument({ view }) {
           alt={view.brandName}
         />
         <div className="iv-title">
-          <h1>Invoice</h1>
+          <h1>{view.title}</h1>
           <p className="iv-number">{view.number}</p>
           {view.docType && <p className="iv-status iv-doctype">{view.docType}</p>}
           {view.showStatus && <p className={`iv-status iv-status-${view.status}`}>{view.statusLabel}</p>}

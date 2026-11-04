@@ -249,12 +249,12 @@ export function InvoicePdfDocument({ view }) {
   const statusColor = view.status === 'paid' ? { color: '#fff' }
     : view.status === 'draft' || view.status === 'void' ? { color: MUTED } : null;
   return (
-    <Document title={`Invoice ${view.number}`} author={view.brandName} creator={view.brandName} producer={view.brandName}>
+    <Document title={`${view.title} ${view.number}`} author={view.brandName} creator={view.brandName} producer={view.brandName}>
       <Page size="A4" style={s.page}>
         <View style={s.head}>
           <Image style={s.logo} src={asset(`brand/cybervex-logo-${view.logoVariant}.png`)} />
           <View style={s.titleBox}>
-            <Text style={s.title}>INVOICE</Text>
+            <Text style={s.title}>{view.title.toUpperCase()}</Text>
             <Text style={s.number}>{view.number}</Text>
             {view.docType ? (
               <View style={[s.status, { backgroundColor: INK }]}>

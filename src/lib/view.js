@@ -126,6 +126,8 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
     : terms || '';
 
   return {
+    // Same document either way; only the heading changes. A balance invoice is always an invoice.
+    title: invoice.kind === 'quotation' && !balance ? 'Quotation' : 'Invoice',
     number: invoice.number,
     status,
     statusLabel: STATUS[status].label,
