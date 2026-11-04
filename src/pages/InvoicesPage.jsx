@@ -8,7 +8,7 @@ import { STATUS, deriveStatus } from '../lib/status';
 import { useStore } from '../lib/storage';
 import { StatusBadge } from '../components/ui';
 
-const FILTERS = ['all', 'draft', 'unpaid', 'partial', 'overdue', 'paid', 'void'];
+const FILTERS = ['all', 'draft', 'unpaid', 'partial', 'advance', 'overdue', 'paid', 'void'];
 const FILTER_LABEL = { all: 'All', ...Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label])) };
 
 /** Sum per currency: invoices in different currencies are never added together. */
@@ -66,7 +66,7 @@ export default function InvoicesPage() {
     });
   }, [rows, query, filter]);
 
-  const open = rows.filter((r) => ['unpaid', 'partial', 'overdue'].includes(r.status));
+  const open = rows.filter((r) => ['unpaid', 'partial', 'advance', 'overdue'].includes(r.status));
   const outstanding = byCurrency(open, (r) => r.totals.balance);
   const overdue = byCurrency(rows.filter((r) => r.status === 'overdue'), (r) => r.totals.balance);
 

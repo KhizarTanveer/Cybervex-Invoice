@@ -1,4 +1,5 @@
 import { computeTotals } from './calc';
+import { advanceWhenLabel } from './defaults';
 import { formatDate, termsLabel } from './dates';
 import { formatDecimal, formatMoney } from './money';
 import { STATUS, deriveStatus } from './status';
@@ -45,7 +46,11 @@ export function buildView(invoice, settings, today) {
 
   const named = (invoice.services ?? []).filter((sv) => sv.name?.trim());
   const services = named.length
-    ? named.map((sv) => ({ id: sv.id, text: sv.name.trim() }))
+    ? named.map((sv) => ({
+      id: sv.id,
+      text: sv.name.trim(),
+      ...(totals.services[sv.id] > 0 ? { price: money(totals.services[sv.id]) } : {}),
+    }))
     : [{ id: 'ph', ...ph('', 'Service') }];
   const reference = invoice.reference?.trim()
     ? [{ label: 'Reference / PO number', text: invoice.reference.trim() }]
@@ -66,6 +71,40 @@ export function buildView(invoice, settings, today) {
   }
   const after = [];
   if (totals.paid > 0) after.push({ label: 'Amount paid', value: `−${money(totals.paid)}` });
+
+  // Advance + final payment, each with how much of it has been settled.
+  const pctText = (n) => `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(n)}%`;
+  const stage = (amount, paidPart, when) => {
+    const state = paidPart >= amount ? 'paid' : paidPart > 0 ? 'part' : 'open';
+    return {
+      amount: money(amount),
+      when,
+      progress: amount > 0 ? Math.min(paidPart / amount, 1) : 0,
+      state,
+      stateLabel: state === 'paid' ? 'Received' : state === 'part' ? `${money(paidPart)} received` : '',
+    };
+  };
+  const schedule = totals.advance > 0
+    ? [
+      {
+        key: 'advance',
+        step: '01',
+        title: 'Advance payment',
+        share: totals.advancePercent,
+        percent: pctText(totals.advancePercent),
+        ...stage(totals.advance, totals.advancePaid, advanceWhenLabel(invoice.advance)),
+      },
+      {
+        key: 'final',
+        step: '02',
+        title: 'Final payment',
+        share: totals.finalPercent,
+        percent: pctText(totals.finalPercent),
+        ...stage(totals.finalPayment, totals.finalPaid, formatDate(invoice.dueDate) ? `Due by ${formatDate(invoice.dueDate)}` : 'Due on completion'),
+      },
+    ]
+    : null;
+  const advanceOpen = totals.advanceOutstanding > 0 && status !== 'void';
 
   const terms = termsLabel(invoice);
   const dueText = formatDate(invoice.dueDate);
@@ -89,7 +128,10 @@ export function buildView(invoice, settings, today) {
     summary,
     total: { label: 'Total', value: money(totals.total) },
     after,
-    due: { label: totals.paid > 0 ? 'Balance due' : 'Total due', value: money(Math.max(totals.balance, 0)) },
+    schedule,
+    due: advanceOpen
+      ? { label: `Advance due now · ${pctText(totals.advancePercent)}`, value: money(totals.advanceOutstanding) }
+      : { label: totals.paid > 0 ? 'Balance due' : 'Total due', value: money(Math.max(totals.balance, 0)) },
     paymentDetails: lines(invoice.paymentDetails, 'Add verified bank or payment details'),
     paymentInstructions: invoice.paymentInstructions?.trim() ?? '',
     notes: invoice.notes?.trim() ?? '',

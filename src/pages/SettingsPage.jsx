@@ -129,6 +129,11 @@ export default function SettingsPage() {
             </Field>
           </div>
 
+          <div className="grid grid-3" style={{ marginTop: 12 }}>
+            <Field label="Default advance (%)" inputMode="decimal" value={form.defaultAdvance ?? ''} placeholder="None"
+              onChange={(e) => set('defaultAdvance', e.target.value)} hint="Pre-fills new invoices; leave empty for none" />
+          </div>
+
           <p className="section-note" style={{ marginTop: 18 }}>
             Default taxes are added to new invoices and can be removed per invoice. Leave empty if tax does not normally apply.
           </p>

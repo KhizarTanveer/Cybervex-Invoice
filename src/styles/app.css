@@ -152,6 +152,7 @@ a.list-row:hover { background: #fbfbfa; }
 .badge-paid { background: var(--ink); border-color: var(--ink); color: var(--white); }
 .badge-overdue { color: var(--danger); border-color: rgba(180, 35, 24, 0.35); }
 .badge-partial { color: var(--ink); }
+.badge-advance { color: var(--ink); border-color: var(--ink); }
 .badge-void { color: var(--faint); text-decoration: line-through; }
 
 /* Editor */
@@ -221,6 +222,53 @@ a.list-row:hover { background: #fbfbfa; }
 .calc { margin-top: 18px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius); font-size: 13px; }
 .calc div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-variant-numeric: tabular-nums; }
 .calc .total { border-top: 1px solid var(--line-strong); margin-top: 6px; padding-top: 8px; font-weight: 600; color: var(--ink); }
+
+/* Per-service prices */
+.price-list { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; }
+.price-row {
+  display: grid; grid-template-columns: 1fr 140px; gap: 12px; align-items: center;
+  padding: 6px 6px 6px 12px; font-size: 13px; color: var(--ink);
+}
+.price-row + .price-row { border-top: 1px solid var(--line); }
+.price-row span { min-width: 0; overflow-wrap: anywhere; }
+.price-row input {
+  height: 32px; padding: 0 10px; text-align: right; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--white);
+}
+.price-row input:focus-visible { outline: none; box-shadow: var(--focus); border-color: var(--ink); }
+.price-row.invalid input { border-color: var(--danger); }
+
+/* Toggle switch */
+.switch { position: relative; display: inline-flex; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch > span:first-of-type {
+  width: 36px; height: 20px; border-radius: 999px; background: var(--line-strong);
+  position: relative; transition: background 0.15s;
+}
+.switch > span:first-of-type::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--white); box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: translate 0.15s;
+}
+.switch input:checked + span { background: var(--ink); }
+.switch input:checked + span::after { translate: 16px 0; }
+.switch input:focus-visible + span { box-shadow: var(--focus); }
+
+/* Advance payment */
+.adv-presets { margin-bottom: 14px; }
+.adv-card {
+  margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 8px;
+  background: linear-gradient(180deg, var(--surface), var(--white));
+}
+.adv-bar { display: flex; gap: 4px; height: 8px; margin-bottom: 14px; }
+.adv-bar span { position: relative; flex-basis: 0; overflow: hidden; border-radius: 999px; background: var(--line); }
+.adv-bar .adv-bar-advance { background: #bdbdbd; }
+.adv-bar i { position: absolute; inset: 0 auto 0 0; background: var(--ink); transition: width 0.3s; }
+.adv-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.adv-parts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adv-parts > div + div { padding-left: 12px; border-left: 1px solid var(--line); }
+.adv-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.adv-parts strong { font-size: 20px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.adv-parts small { font-size: 12px; color: var(--muted); }
 
 .payments-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
 .payments-table td { padding: 8px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }

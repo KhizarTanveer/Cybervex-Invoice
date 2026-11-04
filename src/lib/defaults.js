@@ -1,4 +1,4 @@
-import { addDays, dueDateForTerms, todayISO } from './dates';
+import { addDays, dueDateForTerms, formatDate, isValidISO, todayISO } from './dates';
 import { currencyDigits, divRound, minorToInput, parseScaled } from './money';
 
 export const uid = () =>
@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   paymentDetails: '',
   paymentInstructions: '',
   defaultTaxes: [],
+  defaultAdvance: '',
   logoVariant: 'black',
   counters: {},
 };
@@ -66,6 +67,24 @@ export function normalizeInvoice(inv) {
   return out;
 }
 
+// When the advance is expected. Kept as keys so the wording can change later.
+export const ADVANCE_WHEN = [
+  { value: 'receipt', label: 'Due on receipt' },
+  { value: 'start', label: 'Due before work begins' },
+  { value: 'signing', label: 'Due on contract signing' },
+  { value: 'date', label: 'On a specific date' },
+];
+/** The advance's own due date, when one was picked. */
+export const advanceDate = (adv) => (adv?.when === 'date' && isValidISO(adv.date) ? adv.date : '');
+export function advanceWhenLabel(adv) {
+  const date = advanceDate(adv);
+  if (date) return `Due by ${formatDate(date)}`;
+  const w = ADVANCE_WHEN.find((x) => x.value === adv?.when && x.value !== 'date') ?? ADVANCE_WHEN[0];
+  return w.label;
+}
+
+export const newAdvance = (percent = '') => ({ enabled: !!String(percent ?? '').trim(), percent: String(percent ?? ''), when: 'receipt', date: '' });
+
 export const emptyClient = () => ({
   company: '',
   contact: '',
@@ -98,6 +117,7 @@ export function newInvoice(settings, number) {
     discount: { type: 'percent', value: '' },
     taxes: (settings.defaultTaxes ?? []).map((t) => ({ ...t, id: uid() })),
     charges: [],
+    advance: newAdvance(settings.defaultAdvance),
     payments: [],
     notes: settings.defaultNotes ?? '',
     paymentDetails: settings.paymentDetails ?? '',

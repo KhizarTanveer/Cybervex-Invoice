@@ -6,8 +6,8 @@ import {
 import InvoiceDocument from '../components/InvoiceDocument';
 import { Field, Menu, ScaledPreview, StatusBadge, TextArea, flash, useToast } from '../components/ui';
 import { PAYMENT_TERMS, addDays, dueDateForTerms, formatDate, isValidISO, todayISO } from '../lib/dates';
-import { duplicateInvoice, emptyService, newInvoice, normalizeInvoice, uid } from '../lib/defaults';
-import { currencyOptions, formatMoney, minorToInput, toMinor } from '../lib/money';
+import { ADVANCE_WHEN, advanceWhenLabel, duplicateInvoice, emptyService, newAdvance, newInvoice, normalizeInvoice, uid } from '../lib/defaults';
+import { currencyOptions, formatDecimal, formatMoney, minorToInput, toMinor } from '../lib/money';
 import { isDuplicateNumber, nextInvoiceNumber } from '../lib/numbering';
 import { navigate, setNavigationGuard } from '../lib/router';
 import { CATEGORY_NAMES, SERVICE_CATALOG, SERVICE_NAMES } from '../lib/services';
@@ -15,6 +15,7 @@ import { deleteInvoice, getState, saveInvoice, useStore } from '../lib/storage';
 import { buildView } from '../lib/view';
 
 const CURRENCIES = currencyOptions();
+const ADVANCE_PRESETS = ['25', '30', '40', '50', '60', '75'];
 const METHODS = ['Bank transfer', 'Card', 'PayPal', 'Wise', 'Payoneer', 'Cash', 'Cheque', 'Other'];
 
 function nextNumber() {
@@ -37,10 +38,18 @@ function issueProblems(inv, totals, invoices) {
   if (!isValidISO(inv.dueDate) || inv.dueDate < inv.issueDate) p.push('A due date on or after the issue date');
   if (!inv.services.some((sv) => !blank(sv.name))) p.push('At least one service');
   if (Object.keys(totals.errors).length) p.push('Fix the highlighted amounts');
-  else if (totals.subtotal <= 0) p.push('An overall budget greater than zero');
+  else if (totals.subtotal <= 0) p.push('An overall budget (or service prices) greater than zero');
+  if (totals.errors.advance) p.push('A valid advance percentage (or turn the advance off)');
+  const adv = inv.advance;
+  if (adv?.enabled && adv.when === 'date'
+    && (!isValidISO(adv.date) || adv.date < inv.issueDate || (isValidISO(inv.dueDate) && adv.date > inv.dueDate))) {
+    p.push('An advance due date between the issue date and the final payment date');
+  }
   if (blank(inv.paymentDetails) && blank(inv.paymentInstructions)) p.push('Payment details or payment instructions');
   return p;
 }
+
+const isCustom = (sv) => sv.custom || (sv.name.trim() && !SERVICE_NAMES.has(sv.name));
 
 function safeFilename(s) {
   return s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -392,7 +401,7 @@ export default function EditorPage({ id }) {
             <div className="subhead"><span>Specific &amp; custom services</span></div>
             {draft.services.filter((sv) => !CATEGORY_NAMES.has(sv.name)).map((sv, i) => (
               <div className="sub-row service-row" key={sv.id}>
-                {sv.custom || (sv.name.trim() && !SERVICE_NAMES.has(sv.name)) ? (
+                {isCustom(sv) ? (
                   <Field label={`Custom service ${i + 1}`} value={sv.name} placeholder="Type the service name" autoFocus={!sv.name}
                     onChange={(e) => setListItem('services', sv.id, 'name', e.target.value)} />
                 ) : (
@@ -418,10 +427,33 @@ export default function EditorPage({ id }) {
                 <Plus aria-hidden /> Add custom service
               </button>
             </div>
+            {draft.services.some((sv) => sv.name.trim()) && (
+              <>
+                <div className="subhead"><span>Prices (optional)</span></div>
+                <p className="section-note" style={{ marginTop: 0 }}>
+                  Price each service to show it on its line. The budget then becomes their total.
+                </p>
+                <div className="price-list">
+                  {draft.services.filter((sv) => sv.name.trim()).map((sv) => (
+                    <label key={sv.id} className={`price-row ${err[`service.${sv.id}`] ? 'invalid' : ''}`}>
+                      <span>{sv.name}</span>
+                      <input inputMode="numeric" value={sv.price ?? ''} placeholder="—" aria-label={`Price for ${sv.name}`}
+                        onChange={(e) => setListItem('services', sv.id, 'price', e.target.value)} />
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="grid grid-2">
-              <Field label={`Overall budget (${draft.currency})`} inputMode="numeric" value={draft.budget} placeholder="0"
-                onChange={(e) => setField('budget', e.target.value)} error={err.budget}
-                hint="Total price for all services, before discount and tax" />
+              {totals.servicesTotal > 0 ? (
+                <Field label={`Overall budget (${draft.currency})`} readOnly value={formatMoney(totals.subtotal, draft.currency)}
+                  error={Object.keys(err).some((k) => k.startsWith('service.')) ? 'Prices must be whole numbers' : null}
+                  hint="Total of the service prices above" />
+              ) : (
+                <Field label={`Overall budget (${draft.currency})`} inputMode="numeric" value={draft.budget} placeholder="0"
+                  onChange={(e) => setField('budget', e.target.value)} error={err.budget}
+                  hint="Total price for all services, before discount and tax" />
+              )}
               <Field label="Reference / PO number (optional)" value={draft.reference} onChange={(e) => setField('reference', e.target.value)} />
             </div>
           </section>
@@ -476,6 +508,8 @@ export default function EditorPage({ id }) {
             </div>
           </section>
 
+          <Advance draft={draft} totals={totals} update={update} setDueDate={setDueDate} />
+
           <Payments draft={draft} totals={totals} onSave={persist} />
 
           <section className="section">
@@ -525,13 +559,97 @@ export default function EditorPage({ id }) {
   );
 }
 
+function Advance({ draft, totals, update, setDueDate }) {
+  const adv = draft.advance ?? newAdvance();
+  const set = (key, value) => update((d) => { d.advance = { ...newAdvance(), ...d.advance, [key]: value }; return d; });
+  const error = totals.errors.advance;
+  const money = (v) => formatMoney(v, draft.currency);
+  const shown = totals.advance > 0;
+
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2>Advance payment</h2>
+        <label className="switch">
+          <input type="checkbox" role="switch" checked={!!adv.enabled} onChange={(e) => set('enabled', e.target.checked)} />
+          <span aria-hidden />
+          <span className="visually-hidden">Request an advance payment</span>
+        </label>
+      </div>
+      {!adv.enabled ? (
+        <p className="section-note" style={{ marginBottom: 0 }}>
+          Ask for part of the total up front. The invoice then shows a two-step payment schedule and the amount due now.
+        </p>
+      ) : (
+        <>
+          <div className="chips adv-presets" role="group" aria-label="Advance percentage">
+            {ADVANCE_PRESETS.map((p) => (
+              <button key={p} type="button" className="chip" aria-pressed={adv.percent.trim() === p} onClick={() => set('percent', p)}>{p}%</button>
+            ))}
+          </div>
+          <div className="grid grid-2">
+            <Field label="Advance (%)" inputMode="decimal" value={adv.percent} placeholder="e.g. 50"
+              onChange={(e) => set('percent', e.target.value)} error={error} />
+            <Field label="When is it due?">
+              <select value={adv.when} onChange={(e) => set('when', e.target.value)}>
+                {ADVANCE_WHEN.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
+              </select>
+            </Field>
+            {adv.when === 'date' && (
+              <Field label="Advance due date" type="date" value={adv.date ?? ''} min={draft.issueDate}
+                onChange={(e) => set('date', e.target.value)}
+                error={!isValidISO(adv.date) ? 'Pick a date'
+                  : adv.date < draft.issueDate ? 'Before the issue date'
+                    : isValidISO(draft.dueDate) && adv.date > draft.dueDate ? 'After the final payment date' : null} />
+            )}
+            <Field label="Final payment due date" type="date" value={draft.dueDate} min={adv.when === 'date' ? adv.date || draft.issueDate : draft.issueDate}
+              onChange={(e) => setDueDate(e.target.value)} hint="Same as the invoice due date" />
+          </div>
+
+          {shown && (
+            <div className="adv-card" aria-label="Payment split">
+              <div className="adv-bar" aria-hidden>
+                <span className="adv-bar-advance" style={{ flexGrow: totals.advancePercent }}>
+                  <i style={{ width: `${(totals.advancePaid / totals.advance) * 100}%` }} />
+                </span>
+                <span style={{ flexGrow: totals.finalPercent }}>
+                  <i style={{ width: `${totals.finalPayment > 0 ? (totals.finalPaid / totals.finalPayment) * 100 : 0}%` }} />
+                </span>
+              </div>
+              <div className="adv-parts">
+                <div>
+                  <span className="adv-tag">01 · Advance {formatDecimal(adv.percent)}%</span>
+                  <strong>{money(totals.advance)}</strong>
+                  <small>
+                    {totals.advanceOutstanding <= 0 ? 'Received ✓'
+                      : totals.advancePaid > 0 ? `${money(totals.advancePaid)} received`
+                        : advanceWhenLabel(adv)}
+                  </small>
+                </div>
+                <div>
+                  <span className="adv-tag">02 · Final {formatDecimal(String(totals.finalPercent))}%</span>
+                  <strong>{money(totals.finalPayment)}</strong>
+                  <small>{totals.finalPaid >= totals.finalPayment && totals.finalPayment > 0 ? 'Received ✓'
+                    : draft.dueDate ? `Due by ${formatDate(draft.dueDate)}` : 'Due on completion'}</small>
+                </div>
+              </div>
+            </div>
+          )}
+          {!shown && !error && <p className="muted small" style={{ marginTop: 12 }}>Enter a budget to see the split.</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
 function Payments({ draft, totals, onSave }) {
   const [form, setForm] = useState(null);
   const canRecord = draft.state === 'issued' && totals.balance > 0;
 
   const start = () => setForm({
     date: todayISO(),
-    amount: minorToInput(Math.max(totals.balance, 0)),
+    // Suggest the outstanding advance first, then the remaining balance.
+    amount: minorToInput(Math.max(totals.advanceOutstanding > 0 ? totals.advanceOutstanding : totals.balance, 0)),
     method: 'Bank transfer',
     reference: '',
     confirmed: false,

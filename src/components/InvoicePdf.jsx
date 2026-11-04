@@ -97,7 +97,37 @@ const s = StyleSheet.create({
   },
   bullet: { width: 4, height: 4, borderRadius: 2, backgroundColor: INK, marginTop: 4.6, marginLeft: 1.7, marginRight: 9 },
   svcText: { flex: 1, color: INK, fontWeight: 500 },
-  summary: { marginTop: 5 * MM, marginLeft: 'auto', width: 82 * MM },
+  svcPrice: { marginLeft: 6 * MM, color: INK, fontWeight: 600 },
+  money: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 * MM },
+  schedule: { flex: 1, marginRight: 10 * MM },
+  split: { flexDirection: 'row', height: 1.6 * MM, marginBottom: 1 * MM },
+  splitPart: { flexBasis: 0, backgroundColor: LINE, overflow: 'hidden' },
+  splitFill: { height: '100%', backgroundColor: INK },
+  stage: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 2.4 * MM,
+    borderBottomWidth: 1,
+    borderBottomColor: LINE,
+  },
+  step: {
+    width: 5.6 * MM,
+    height: 5.6 * MM,
+    marginRight: 3 * MM,
+    borderWidth: 1,
+    borderColor: INK,
+    borderRadius: 2.8 * MM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepText: { fontSize: 6.5, lineHeight: 1, fontWeight: 600, color: INK },
+  stageMain: { flex: 1 },
+  stageTitle: { color: INK, fontWeight: 600 },
+  stagePct: { fontWeight: 500, color: MUTED },
+  stageWhen: { fontSize: 7.5, color: MUTED },
+  stageAmt: { textAlign: 'right', color: INK, fontWeight: 600 },
+  stageState: { textAlign: 'right', fontSize: 6.5, fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', color: MUTED },
+  summary: { marginLeft: 'auto', width: 82 * MM },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1.5 * MM },
   sumValue: { color: INK },
   totalRow: {
@@ -168,6 +198,39 @@ function Grid({ cells }) {
   );
 }
 
+function Schedule({ stages }) {
+  return (
+    <View style={s.schedule}>
+      <Text style={s.label}>Payment schedule</Text>
+      <View style={s.split}>
+        {stages.map((st, i) => (
+          <View
+            key={st.key}
+            style={[s.splitPart, { flexGrow: st.share, marginLeft: i > 0 ? 1 * MM : 0 }, st.key === 'advance' ? { backgroundColor: '#bdbdbd' } : null]}
+          >
+            <View style={[s.splitFill, { width: `${st.progress * 100}%` }]} />
+          </View>
+        ))}
+      </View>
+      {stages.map((st) => (
+        <View key={st.key} style={s.stage}>
+          <View style={[s.step, st.state === 'paid' ? { backgroundColor: INK } : null]}>
+            <Text style={[s.stepText, st.state === 'paid' ? { color: '#fff' } : null]}>{st.step}</Text>
+          </View>
+          <View style={s.stageMain}>
+            <Text style={s.stageTitle}>{st.title}  <Text style={s.stagePct}>{st.percent}</Text></Text>
+            <Text style={s.stageWhen}>{st.when}</Text>
+          </View>
+          <View>
+            <Text style={s.stageAmt}>{st.amount}</Text>
+            {st.stateLabel ? <Text style={[s.stageState, st.state === 'paid' ? { color: INK } : null]}>{st.stateLabel}</Text> : null}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function InvoicePdfDocument({ view }) {
   const statusBox = view.status === 'paid'
     ? { backgroundColor: INK }
@@ -205,29 +268,33 @@ export function InvoicePdfDocument({ view }) {
           <View key={sv.id} style={s.svcRow} wrap={false}>
             <View style={s.bullet} />
             <P part={sv} style={s.svcText} />
+            {sv.price ? <Text style={s.svcPrice}>{sv.price}</Text> : null}
           </View>
         ))}
 
-        <View style={s.summary} wrap={false}>
-          {view.summary.map((r) => (
-            <View key={r.label} style={s.sumRow}>
-              <Text>{r.label}</Text>
-              <Text style={s.sumValue}>{r.value}</Text>
+        <View style={s.money} wrap={false}>
+          {view.schedule && <Schedule stages={view.schedule} />}
+          <View style={s.summary}>
+            {view.summary.map((r) => (
+              <View key={r.label} style={s.sumRow}>
+                <Text>{r.label}</Text>
+                <Text style={s.sumValue}>{r.value}</Text>
+              </View>
+            ))}
+            <View style={s.totalRow}>
+              <Text style={s.totalText}>{view.total.label}</Text>
+              <Text style={s.totalText}>{view.total.value}</Text>
             </View>
-          ))}
-          <View style={s.totalRow}>
-            <Text style={s.totalText}>{view.total.label}</Text>
-            <Text style={s.totalText}>{view.total.value}</Text>
-          </View>
-          {view.after.map((r) => (
-            <View key={r.label} style={s.sumRow}>
-              <Text>{r.label}</Text>
-              <Text style={s.sumValue}>{r.value}</Text>
+            {view.after.map((r) => (
+              <View key={r.label} style={s.sumRow}>
+                <Text>{r.label}</Text>
+                <Text style={s.sumValue}>{r.value}</Text>
+              </View>
+            ))}
+            <View style={s.due}>
+              <Text style={s.dueLabel}>{view.due.label}</Text>
+              <Text style={s.dueValue}>{view.due.value}</Text>
             </View>
-          ))}
-          <View style={s.due}>
-            <Text style={s.dueLabel}>{view.due.label}</Text>
-            <Text style={s.dueValue}>{view.due.value}</Text>
           </View>
         </View>
 

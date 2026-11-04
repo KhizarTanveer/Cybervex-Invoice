@@ -16,12 +16,19 @@ export function computeTotals(invoice) {
   const whole = 'Enter a whole number (no decimals)';
   const errors = {};
 
-  // One overall budget covers all listed services.
+  // The budget is either the sum of per-service prices or, when no service is
+  // priced, one overall figure covering all of them.
+  const servicePrices = (invoice.services ?? []).map((sv) => {
+    const amt = parseScaled(sv.price ?? '', digits);
+    if (amt === null) errors[`service.${sv.id}`] = whole;
+    return { id: sv.id, amount: amt ?? 0n };
+  });
+  const servicesTotal = servicePrices.reduce((s, sv) => s + sv.amount, 0n);
   const budget = parseScaled(invoice.budget, digits);
-  if (budget === null) {
+  if (budget === null && servicesTotal === 0n) {
     errors['budget'] = whole;
   }
-  const subtotal = budget ?? 0n;
+  const subtotal = servicesTotal > 0n ? servicesTotal : (budget ?? 0n);
 
   let discount = 0n;
   const d = invoice.discount ?? { type: 'percent', value: '' };
@@ -60,8 +67,25 @@ export function computeTotals(invoice) {
   const payments = (invoice.payments ?? []).map((p) => ({ id: p.id, amount: parseScaled(p.amount, digits) ?? 0n }));
   const paid = payments.reduce((s, p) => s + p.amount, 0n);
 
+  // Advance: a share of the total requested up front. Payments count toward it first.
+  let advancePct = 0n;
+  let advance = 0n;
+  if (invoice.advance?.enabled) {
+    const pct = parseScaled(invoice.advance.percent, PCT_SCALE);
+    if (pct === null || pct <= 0n || pct >= 100n * PCT_UNIT) errors['advance'] = 'Enter a percentage between 1 and 99';
+    else {
+      advancePct = pct;
+      advance = divRound(total * pct, 100n * PCT_UNIT);
+    }
+  }
+  const advancePaid = paid < advance ? paid : advance;
+  const finalPayment = total - advance;
+  const finalPaid = paid - advancePaid;
+
   const num = (v) => Number(v);
   return {
+    services: Object.fromEntries(servicePrices.map((sv) => [sv.id, num(sv.amount)])),
+    servicesTotal: num(servicesTotal),
     subtotal: num(subtotal),
     discount: num(discount),
     taxableBase: num(taxableBase),
@@ -72,6 +96,13 @@ export function computeTotals(invoice) {
     total: num(total),
     paid: num(paid),
     balance: num(total - paid),
+    advancePercent: advance > 0n ? Number(advancePct) / Number(PCT_UNIT) : 0,
+    finalPercent: advance > 0n ? Number(100n * PCT_UNIT - advancePct) / Number(PCT_UNIT) : 100,
+    advance: num(advance),
+    advancePaid: num(advancePaid),
+    advanceOutstanding: num(advance - advancePaid),
+    finalPayment: num(finalPayment),
+    finalPaid: num(finalPaid),
     errors,
   };
 }

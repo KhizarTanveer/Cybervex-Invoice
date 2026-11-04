@@ -89,10 +89,81 @@ describe('computeTotals', () => {
     expect(computeTotals(inv({ budget: '100', charges: [{ id: 'c', amount: '9.99' }] })).errors['charge.c']).toBeTruthy();
   });
 
+  it('uses the sum of service prices as the budget when services are priced', () => {
+    const t = computeTotals(inv({
+      budget: '1000',
+      services: [{ id: 'a', name: 'SEO', price: '750' }, { id: 'b', name: 'Logo', price: '250' }, { id: 'c', name: 'Ads' }],
+      discount: { type: 'percent', value: '10' },
+    }));
+    expect(t.servicesTotal).toBe(1000);
+    expect(t.subtotal).toBe(1000);
+    expect(t.discount).toBe(100);
+    expect(t.services.a).toBe(750);
+    expect(computeTotals(inv({ services: [{ id: 'b', price: '9.5' }] })).errors['service.b']).toBeTruthy();
+    expect(computeTotals(inv({ budget: 'x', services: [{ id: 'b', price: '10' }] })).errors.budget).toBeUndefined();
+  });
+
   it('flags an invalid budget instead of guessing', () => {
     const t = computeTotals(inv({ budget: 'two thousand' }));
     expect(t.errors.budget).toBeTruthy();
     expect(t.subtotal).toBe(0);
+  });
+});
+
+describe('advance payment', () => {
+  const adv = (percent, extra = {}) => inv({ budget: '1000', advance: { enabled: true, percent, when: 'receipt' }, ...extra });
+
+  it('splits the total into an advance and a final payment', () => {
+    const t = computeTotals(adv('40', { taxes: [{ id: 't', rate: '10' }] })); // total 1100
+    expect(t.advance).toBe(440);
+    expect(t.finalPayment).toBe(660);
+    expect(t.advancePercent).toBe(40);
+    expect(t.finalPercent).toBe(60);
+    expect(t.advanceOutstanding).toBe(440);
+  });
+
+  it('counts payments toward the advance first', () => {
+    const t = computeTotals(adv('50', { payments: [{ id: 'p', amount: '700' }] }));
+    expect(t.advancePaid).toBe(500);
+    expect(t.advanceOutstanding).toBe(0);
+    expect(t.finalPaid).toBe(200);
+    expect(t.balance).toBe(300);
+  });
+
+  it('ignores a disabled advance and rejects out-of-range percentages', () => {
+    expect(computeTotals(inv({ budget: '1000', advance: { enabled: false, percent: '50' } })).advance).toBe(0);
+    expect(computeTotals(adv('100')).errors.advance).toBeTruthy();
+    expect(computeTotals(adv('0')).errors.advance).toBeTruthy();
+    expect(computeTotals(adv('abc')).advance).toBe(0);
+  });
+
+  it('marks an issued invoice as advance received once the advance is covered', () => {
+    const t = computeTotals(adv('30', { payments: [{ id: 'p', amount: '300' }] }));
+    expect(deriveStatus({ state: 'issued', dueDate: '2999-01-01' }, t, '2026-11-02')).toBe('advance');
+    expect(deriveStatus({ state: 'issued', dueDate: '2026-11-01' }, t, '2026-11-02')).toBe('overdue');
+  });
+
+  it('uses a picked advance date on the document and for overdue status', async () => {
+    const { buildView } = await import('./view');
+    const base = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], payments: [], from: {}, to: {}, discount: { type: 'percent', value: '' }, dueDate: '2026-12-31', advance: { enabled: true, percent: '50', when: 'date', date: '2026-11-10' } };
+    const v = buildView(base, {});
+    expect(v.schedule[0].when).toBe('Due by 10 Nov 2026');
+    expect(v.schedule[1].when).toBe('Due by 31 Dec 2026');
+    const t = computeTotals(base);
+    expect(deriveStatus({ ...base, state: 'issued' }, t, '2026-11-09')).toBe('unpaid');
+    expect(deriveStatus({ ...base, state: 'issued' }, t, '2026-11-11')).toBe('overdue');
+  });
+
+  it('asks for the advance first on the document', async () => {
+    const { buildView } = await import('./view');
+    const base = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, discount: { type: 'percent', value: '' }, advance: { enabled: true, percent: '25', when: 'start' } };
+    const open = buildView({ ...base, payments: [] }, {});
+    expect(open.due.value).toBe('$250');
+    expect(open.schedule.map((s) => s.amount)).toEqual(['$250', '$750']);
+    expect(open.schedule[0].when).toBe('Due before work begins');
+    const paid = buildView({ ...base, payments: [{ id: 'p', amount: '250' }] }, {});
+    expect(paid.due.value).toBe('$750');
+    expect(paid.schedule[0].state).toBe('paid');
   });
 });
 

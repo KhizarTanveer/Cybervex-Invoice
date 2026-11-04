@@ -113,6 +113,9 @@
 .iv-services ul { list-style: none; margin: 0; padding: 0; }
 .iv-services li {
   position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 6mm;
   padding: 2.6mm 0 2.6mm 5mm;
   border-bottom: 1px solid var(--iv-line);
   color: var(--iv-ink);
@@ -132,9 +135,61 @@
   background: var(--iv-ink);
 }
 
-/* Summary */
+.iv-svc-price { flex: none; font-weight: 600; white-space: nowrap; }
+
+/* Summary, with the optional payment schedule to its left */
+.iv-money {
+  display: flex;
+  align-items: flex-start;
+  gap: 10mm;
+  margin-top: 5mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.iv-schedule { flex: 1; min-width: 0; }
+.iv-split { display: flex; gap: 1mm; height: 1.6mm; margin-bottom: 1mm; }
+.iv-split span { position: relative; flex-basis: 0; overflow: hidden; background: var(--iv-line); }
+.iv-split .iv-split-advance { background: #bdbdbd; }
+.iv-split i { position: absolute; inset: 0 auto 0 0; background: var(--iv-ink); }
+.iv-schedule ol { list-style: none; margin: 0; padding: 0; }
+.iv-stage {
+  display: flex;
+  align-items: flex-start;
+  gap: 3mm;
+  padding: 2.4mm 0;
+  border-bottom: 1px solid var(--iv-line);
+}
+.iv-step {
+  flex: none;
+  width: 5.6mm;
+  height: 5.6mm;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--iv-ink);
+  border-radius: 50%;
+  font-size: 6.5pt;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--iv-ink);
+}
+.iv-stage-paid .iv-step { background: var(--iv-ink); color: #fff; }
+.iv-stage-main { flex: 1; min-width: 0; }
+.iv-stage-title { color: var(--iv-ink); font-weight: 600; }
+.iv-stage-title span { margin-left: 1.5mm; font-weight: 500; color: var(--iv-muted); }
+.iv-stage-when { font-size: 7.5pt; color: var(--iv-muted); }
+.iv-stage-amt { text-align: right; color: var(--iv-ink); font-weight: 600; white-space: nowrap; }
+.iv-stage-state {
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--iv-muted);
+}
+.iv-stage-paid .iv-stage-state { color: var(--iv-ink); }
+
 .iv-summary {
-  margin: 5mm 0 0 auto;
+  flex: none;
+  margin: 0 0 0 auto;
   width: 82mm;
   break-inside: avoid;
   page-break-inside: avoid;
