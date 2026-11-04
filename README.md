@@ -42,9 +42,29 @@ npm run build    # static build in dist/ (works from any folder or sub-path)
 
 ## Data & privacy
 
-Invoices are stored only in this browser's `localStorage` (keys prefixed `cybervex-invoice:v1:`).
-Nothing is sent to a server, and there are no API keys. Clearing browser data deletes the invoices,
-so use **Settings → Export backup** regularly and store the file securely.
+Without cloud sync, invoices are stored only in this browser's `localStorage` (keys prefixed
+`cybervex-invoice:v1:`). Clearing browser data deletes them, so use **Settings → Export backup**
+regularly and store the file securely.
+
+## Cloud sync (Supabase)
+
+With Supabase configured, users sign in and their invoices and settings sync across devices.
+The browser copy stays the working copy (instant, works offline); every change is queued and
+uploaded, and the latest data is downloaded on sign-in and when the tab regains focus.
+The first sign-in on a browser uploads the invoices already stored there.
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. **SQL Editor → New query**: paste [`supabase/schema.sql`](supabase/schema.sql) and run it.
+   It creates the `invoices` and `settings` tables with Row Level Security, so each account only
+   sees its own data.
+3. **Authentication → Sign In / Providers → Email**: turn **off** "Allow new users to sign up".
+   Then **Authentication → Users → Add user** to create each login (email + password, auto-confirm).
+4. **Project Settings → API**: copy the Project URL and the `anon` public key into `.env`
+   (see `.env.example`) and into your host's environment variables
+   (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`), then redeploy.
+   Never use the `service_role` key in this app.
+
+Leave the variables empty to run local-only.
 
 ## Assets
 

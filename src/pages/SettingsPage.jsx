@@ -7,6 +7,7 @@ import { currencyOptions } from '../lib/money';
 import { nextInvoiceNumber, sanitizePrefix } from '../lib/numbering';
 import { setNavigationGuard } from '../lib/router';
 import { exportBackup, importBackup, saveSettings, useStore } from '../lib/storage';
+import { PRE_SYNC_KEY, syncEnabled } from '../lib/sync';
 
 const CURRENCIES = currencyOptions();
 
@@ -41,15 +42,19 @@ export default function SettingsPage() {
     }
   };
 
-  const download = () => {
-    const blob = new Blob([exportBackup()], { type: 'application/json' });
+  const saveJson = (json, name) => {
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cybervex-invoices-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = name;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
+  const download = () => saveJson(exportBackup(), `cybervex-invoices-backup-${new Date().toISOString().slice(0, 10)}.json`);
+
+  // The copy taken on this browser just before its first upload to the cloud.
+  const preSync = (() => { try { return localStorage.getItem(PRE_SYNC_KEY); } catch { return null; } })();
 
   const restore = async (e) => {
     const file = e.target.files?.[0];
@@ -165,11 +170,19 @@ export default function SettingsPage() {
         <section className="section">
           <div className="section-head"><h2>Data &amp; backup</h2></div>
           <p className="section-note">
-            Invoices are stored only in this browser on this device. Nothing is uploaded. Export a backup regularly,
-            and keep it somewhere safe because it contains client and financial details.
+            {syncEnabled
+              ? 'Invoices are saved to your account and synced to every device you sign in on. A backup file is still useful as an extra copy.'
+              : 'Invoices are stored only in this browser on this device. Nothing is uploaded.'}
+            {' '}Export a backup regularly, and keep it somewhere safe because it contains client and financial details.
           </p>
           <div className="toolbar">
             <button type="button" className="btn" onClick={download}><Download aria-hidden /> Export backup</button>
+            {preSync && (
+              <button type="button" className="btn" onClick={() => saveJson(preSync, 'cybervex-invoices-before-cloud-sync.json')}
+                title="The invoices that were in this browser before the first cloud sync">
+                <Download aria-hidden /> Pre-sync copy
+              </button>
+            )}
             <button type="button" className="btn" onClick={() => fileRef.current?.click()}><Upload aria-hidden /> Import backup</button>
             <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={restore} />
           </div>

@@ -2,9 +2,10 @@ import { useSyncExternalStore } from 'react';
 import { DEFAULT_SETTINGS, normalizeInvoice } from './defaults';
 import { bumpCounters, isDuplicateNumber, normalizeNumber } from './numbering';
 
-// Local-first persistence. Data stays in this browser's localStorage under keys
-// that are separate from any other app on the same origin. Nothing is sent anywhere.
-const KEYS = {
+// Local-first persistence. Data is kept in this browser's localStorage under keys
+// that are separate from any other app on the same origin. When cloud sync is
+// configured, sync.js mirrors every change to the database (see setChangeHook).
+export const KEYS = {
   invoices: 'cybervex-invoice:v1:invoices',
   settings: 'cybervex-invoice:v1:settings',
 };
@@ -29,6 +30,10 @@ function write(key, value) {
     );
   }
 }
+
+// Called after every local change so sync.js can queue it for upload.
+let onChange = () => {};
+export const setChangeHook = (fn) => { onChange = fn; };
 
 function loadSettings() {
   const stored = read(KEYS.settings, {});
@@ -81,6 +86,7 @@ export function saveInvoice(invoice) {
   write(KEYS.invoices, nextInvoices);
   write(KEYS.settings, nextSettings);
   setState({ invoices: nextInvoices, settings: nextSettings });
+  onChange({ invoices: [saved.id], settings: true });
   return saved;
 }
 
@@ -88,11 +94,29 @@ export function deleteInvoice(id) {
   const nextInvoices = state.invoices.filter((i) => i.id !== id);
   write(KEYS.invoices, nextInvoices);
   setState({ ...state, invoices: nextInvoices });
+  onChange({ deleted: [id] });
 }
 
 export function saveSettings(settings) {
   write(KEYS.settings, settings);
   setState({ ...state, settings });
+  onChange({ settings: true });
+}
+
+/** Replace everything (used by sync after downloading). Does not trigger the change hook. */
+export function replaceAll({ invoices, settings }) {
+  const next = {
+    invoices: invoices.map(normalizeInvoice),
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...settings,
+      business: { ...DEFAULT_SETTINGS.business, ...settings?.business },
+      counters: { ...settings?.counters },
+    },
+  };
+  write(KEYS.invoices, next.invoices);
+  write(KEYS.settings, next.settings);
+  setState(next);
 }
 
 export function exportBackup() {
@@ -131,5 +155,6 @@ export function importBackup(json) {
   write(KEYS.invoices, invoices);
   write(KEYS.settings, settings);
   setState({ invoices, settings });
+  onChange({ invoices: invoices.map((i) => i.id), settings: true });
   return { imported: data.invoices.length - skipped, skipped };
 }
