@@ -78,6 +78,7 @@
   text-transform: uppercase;
   color: var(--iv-ink);
 }
+.iv-doctype { background: var(--iv-ink); color: #fff; }
 .iv-status-paid { background: var(--iv-ink); color: #fff; }
 .iv-status-draft, .iv-status-void { border-style: dashed; color: var(--iv-muted); border-color: var(--iv-muted); }
 

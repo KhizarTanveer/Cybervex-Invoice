@@ -24,6 +24,13 @@ export function addDays(iso, days) {
   return toISO(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
 }
 
+/** Whole days from one ISO date to another (negative when `to` is earlier). */
+export function daysBetween(from, to) {
+  if (!isValidISO(from) || !isValidISO(to)) return null;
+  const utc = (iso) => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+  return Math.round((utc(to) - utc(from)) / 86400000);
+}
+
 /** "02 Nov 2026": unambiguous for international clients. */
 export function formatDate(iso) {
   if (!isValidISO(iso)) return '';

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowLeft, Ban, Check, Copy, Download, Ellipsis, Plus, Printer, RotateCcw, Save, Trash2, X,
+  ArrowLeft, Ban, Check, Copy, Download, Ellipsis, FileText, Plus, Printer, Receipt, RotateCcw, Save, Trash2, X,
 } from 'lucide-react';
 import InvoiceDocument from '../components/InvoiceDocument';
 import { Field, Menu, ScaledPreview, StatusBadge, TextArea, flash, useToast } from '../components/ui';
@@ -12,7 +12,7 @@ import { isDuplicateNumber, nextInvoiceNumber } from '../lib/numbering';
 import { navigate, setNavigationGuard } from '../lib/router';
 import { CATEGORY_NAMES, SERVICE_CATALOG, SERVICE_NAMES } from '../lib/services';
 import { deleteInvoice, getState, saveInvoice, useStore } from '../lib/storage';
-import { buildView } from '../lib/view';
+import { buildReceipt, buildView } from '../lib/view';
 
 const CURRENCIES = currencyOptions();
 const ADVANCE_PRESETS = ['25', '30', '40', '50', '60', '75'];
@@ -53,6 +53,17 @@ const isCustom = (sv) => sv.custom || (sv.name.trim() && !SERVICE_NAMES.has(sv.n
 
 function safeFilename(s) {
   return s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeFilename(name) || 'document'}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 export default function EditorPage({ id }) {
@@ -214,19 +225,15 @@ export default function EditorPage({ id }) {
     }
   };
 
-  const downloadPdf = async () => {
+  // Something received and something still pending: a balance invoice makes sense.
+  const canBalance = draft.state === 'issued' && totals.paid > 0 && totals.balance > 0;
+
+  const downloadPdf = async ({ balance = false } = {}) => {
     setBusy(true);
     try {
       const { renderInvoicePdf } = await import('../components/InvoicePdf');
-      const blob = await renderInvoicePdf(view);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeFilename([draft.number, draft.to.company].filter(Boolean).join(' - ')) || 'invoice'}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      const blob = await renderInvoicePdf(balance ? buildView(draft, settings, undefined, { balance: true }) : view);
+      saveBlob(blob, [draft.number, balance && 'Balance', draft.to.company].filter(Boolean).join(' - '));
     } catch (e) {
       console.error(e);
       toast('Could not create the PDF. Please try again.', 'error');
@@ -264,7 +271,7 @@ export default function EditorPage({ id }) {
               <Check aria-hidden /><span className="btn-label">Issue invoice</span>
             </button>
           )}
-          <button type="button" className="btn" onClick={downloadPdf} disabled={busy} aria-label="Download PDF">
+          <button type="button" className="btn" onClick={() => downloadPdf()} disabled={busy} aria-label="Download PDF">
             <Download aria-hidden /><span className="btn-label">{busy ? 'Preparing…' : 'Download PDF'}</span>
           </button>
           <button type="button" className="btn" onClick={print} aria-label="Print invoice">
@@ -273,6 +280,10 @@ export default function EditorPage({ id }) {
           <Menu label="More" icon={<Ellipsis aria-hidden />}>
             <button type="button" role="menuitem" onClick={duplicate} disabled={!stored}>
               <Copy aria-hidden /> Duplicate invoice
+            </button>
+            <button type="button" role="menuitem" onClick={() => downloadPdf({ balance: true })} disabled={!canBalance || busy}
+              title={canBalance ? undefined : 'Available once a payment is recorded and a balance is still pending'}>
+              <FileText aria-hidden /> Download balance invoice
             </button>
             {draft.state === 'issued' && (
               <button type="button" role="menuitem" onClick={revertToDraft} disabled={totals.paid > 0 || isNew}>
@@ -510,7 +521,7 @@ export default function EditorPage({ id }) {
 
           <Advance draft={draft} totals={totals} update={update} setDueDate={setDueDate} />
 
-          <Payments draft={draft} totals={totals} onSave={persist} />
+          <Payments draft={draft} totals={totals} onSave={persist} settings={settings} toast={toast} />
 
           <section className="section">
             <div className="section-head"><h2>Payment details &amp; notes</h2></div>
@@ -642,8 +653,23 @@ function Advance({ draft, totals, update, setDueDate }) {
   );
 }
 
-function Payments({ draft, totals, onSave }) {
+function Payments({ draft, totals, onSave, settings, toast }) {
   const [form, setForm] = useState(null);
+  const [printing, setPrinting] = useState(null);
+
+  const downloadReceipt = async (p) => {
+    setPrinting(p.id);
+    try {
+      const { renderReceiptPdf } = await import('../components/InvoicePdf');
+      const receipt = buildReceipt(draft, settings, p.id);
+      saveBlob(await renderReceiptPdf(receipt), [receipt.number, 'Receipt', draft.to.company].filter(Boolean).join(' - '));
+    } catch (e) {
+      console.error(e);
+      toast('Could not create the receipt. Please try again.', 'error');
+    } finally {
+      setPrinting(null);
+    }
+  };
   const canRecord = draft.state === 'issued' && totals.balance > 0;
 
   const start = () => setForm({
@@ -688,6 +714,8 @@ function Payments({ draft, totals, onSave }) {
                 <td>{p.method}{p.reference && <div className="muted small">{p.reference}</div>}</td>
                 <td className="num">{formatMoney(Number(toMinor(p.amount, draft.currency) ?? 0n), draft.currency)}</td>
                 <td className="num">
+                  <button type="button" className="icon-btn" aria-label="Download receipt" title="Download receipt"
+                    disabled={printing === p.id} onClick={() => downloadReceipt(p)}><Receipt /></button>
                   <button type="button" className="icon-btn" aria-label="Remove payment" onClick={() => removePayment(p)}><X /></button>
                 </td>
               </tr>

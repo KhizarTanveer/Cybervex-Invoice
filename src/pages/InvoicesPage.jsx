@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, Plus, Search } from 'lucide-react';
 import { computeTotals } from '../lib/calc';
-import { formatDate, todayISO } from '../lib/dates';
+import { daysBetween, formatDate, todayISO } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { navigate } from '../lib/router';
-import { STATUS, deriveStatus } from '../lib/status';
+import { STATUS, deriveStatus, pendingPayment } from '../lib/status';
 import { useStore } from '../lib/storage';
 import { StatusBadge } from '../components/ui';
 
@@ -19,6 +19,56 @@ function byCurrency(rows, pick) {
     if (v > 0) m.set(r.inv.currency, (m.get(r.inv.currency) ?? 0) + v);
   }
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function dueText(days) {
+  if (days === null) return 'No due date';
+  if (days < 0) return `${-days} day${days === -1 ? '' : 's'} overdue`;
+  if (days === 0) return 'Due today';
+  return `Due in ${days} day${days === 1 ? '' : 's'}`;
+}
+
+/** Every open invoice with what is owed next, most urgent first. */
+function PendingPayments({ rows }) {
+  const today = todayISO();
+  const items = rows
+    .map((r) => {
+      const next = pendingPayment(r.inv, r.totals);
+      return { ...r, next, days: daysBetween(today, next.date) };
+    })
+    .filter((r) => r.next.amount > 0)
+    .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
+  if (!items.length) return null;
+
+  return (
+    <section className="pending" aria-label="Pending payments">
+      <div className="pending-head">
+        <h2>Pending payments</h2>
+        <span className="muted small">{items.length} invoice{items.length === 1 ? '' : 's'} awaiting payment</span>
+      </div>
+      <ul>
+        {items.map(({ inv, totals, next, days }) => (
+          <li key={inv.id}>
+            <a
+              href={`#/invoice/${inv.id}`}
+              className={days !== null && days < 0 ? 'is-late' : days !== null && days <= 3 ? 'is-soon' : ''}
+              onClick={(e) => { e.preventDefault(); navigate(`/invoice/${inv.id}`); }}
+            >
+              <span className="pending-client">
+                <strong>{inv.to?.company || 'Untitled client'}</strong>
+                <span className="muted small">{inv.number} · {next.label} pending</span>
+              </span>
+              <span className="pending-bar" aria-hidden>
+                <i style={{ width: `${totals.total > 0 ? Math.min(totals.paid / totals.total, 1) * 100 : 0}%` }} />
+              </span>
+              <span className="pending-when">{dueText(days)}</span>
+              <span className="pending-amt">{formatMoney(next.amount, inv.currency)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function MoneyList({ entries }) {
@@ -93,6 +143,8 @@ export default function InvoicesPage() {
           <p className="stat-value">{counts.draft ?? 0}</p>
         </div>
       </section>
+
+      <PendingPayments rows={open} />
 
       <div className="toolbar">
         <label className="search">

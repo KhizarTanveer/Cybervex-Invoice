@@ -62,6 +62,7 @@ export default function InvoiceDocument({ view }) {
         <div className="iv-title">
           <h1>Invoice</h1>
           <p className="iv-number">{view.number}</p>
+          {view.docType && <p className="iv-status iv-doctype">{view.docType}</p>}
           {view.showStatus && <p className={`iv-status iv-status-${view.status}`}>{view.statusLabel}</p>}
         </div>
       </header>

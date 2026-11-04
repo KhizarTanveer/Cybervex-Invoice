@@ -14,12 +14,9 @@ const lines = (value, label) =>
   value?.trim() ? value.trim().split(/\r?\n/).filter(Boolean).map(val) : [ph('', label)];
 const optional = (value) => (value?.trim() ? [val(value.trim())] : []);
 
-export function buildView(invoice, settings, today) {
-  const totals = computeTotals(invoice);
-  const status = deriveStatus(invoice, totals, today);
-  const money = (m) => formatMoney(m, invoice.currency);
-  const { from = {}, to = {} } = invoice;
+const pctText = (n) => `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(n)}%`;
 
+function partyLines(from = {}, to = {}) {
   const fromLines = [
     { ...ph(from.legalName, 'Legal business name'), strong: true },
     ...lines(from.address, 'Business address'),
@@ -28,7 +25,6 @@ export function buildView(invoice, settings, today) {
     ...optional(from.website),
     ...(from.taxId?.trim() ? [val(`${from.taxLabel?.trim() || 'Tax ID'}: ${from.taxId.trim()}`)] : []),
   ];
-
   const toLines = [
     { ...ph(to.company, 'Client or company name'), strong: true },
     ...optional(to.contact && `Attn: ${to.contact.trim()}`),
@@ -36,6 +32,19 @@ export function buildView(invoice, settings, today) {
     ...optional(to.email),
     ...(to.taxId?.trim() ? [val(`${to.taxLabel?.trim() || 'Tax ID'}: ${to.taxId.trim()}`)] : []),
   ];
+  return { fromLines, toLines };
+}
+
+/**
+ * `balance: true` builds the balance invoice: the same document, with what has
+ * been received deducted and only the pending amount due.
+ */
+export function buildView(invoice, settings, today, { balance = false } = {}) {
+  const totals = computeTotals(invoice);
+  const status = deriveStatus(invoice, totals, today);
+  const money = (m) => formatMoney(m, invoice.currency);
+  const { from = {}, to = {} } = invoice;
+  const { fromLines, toLines } = partyLines(from, to);
 
   const meta = [
     { label: 'Issue date', ...ph(formatDate(invoice.issueDate), 'Date') },
@@ -70,10 +79,14 @@ export function buildView(invoice, settings, today) {
     summary.push({ label: c.label?.trim() || 'Additional charge', value: money(totals.charges[c.id]) });
   }
   const after = [];
-  if (totals.paid > 0) after.push({ label: 'Amount paid', value: `−${money(totals.paid)}` });
+  if (balance && totals.advancePaid > 0) {
+    after.push({ label: `Advance received (${pctText(totals.advancePercent)})`, value: `−${money(totals.advancePaid)}` });
+    if (totals.finalPaid > 0) after.push({ label: 'Further payments received', value: `−${money(totals.finalPaid)}` });
+  } else if (totals.paid > 0) {
+    after.push({ label: balance ? 'Payments received' : 'Amount paid', value: `−${money(totals.paid)}` });
+  }
 
   // Advance + final payment, each with how much of it has been settled.
-  const pctText = (n) => `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(n)}%`;
   const stage = (amount, paidPart, when) => {
     const state = paidPart >= amount ? 'paid' : paidPart > 0 ? 'part' : 'open';
     return {
@@ -104,7 +117,7 @@ export function buildView(invoice, settings, today) {
       },
     ]
     : null;
-  const advanceOpen = totals.advanceOutstanding > 0 && status !== 'void';
+  const advanceOpen = !balance && totals.advanceOutstanding > 0 && status !== 'void';
 
   const terms = termsLabel(invoice);
   const dueText = formatDate(invoice.dueDate);
@@ -117,7 +130,8 @@ export function buildView(invoice, settings, today) {
     status,
     statusLabel: STATUS[status].label,
     // Drafts and unpaid invoices carry no label on the document itself.
-    showStatus: status !== 'unpaid' && status !== 'draft',
+    showStatus: !balance && status !== 'unpaid' && status !== 'draft',
+    docType: balance ? 'Balance invoice' : '',
     brandName: from.brandName || 'Cybervex Digital',
     logoVariant: settings.logoVariant === 'silver' ? 'silver' : 'black',
     fromLines,
@@ -131,7 +145,7 @@ export function buildView(invoice, settings, today) {
     schedule,
     due: advanceOpen
       ? { label: `Advance due now · ${pctText(totals.advancePercent)}`, value: money(totals.advanceOutstanding) }
-      : { label: totals.paid > 0 ? 'Balance due' : 'Total due', value: money(Math.max(totals.balance, 0)) },
+      : { label: balance || totals.paid > 0 ? 'Balance due' : 'Total due', value: money(Math.max(totals.balance, 0)) },
     paymentDetails: lines(invoice.paymentDetails, 'Add verified bank or payment details'),
     paymentInstructions: invoice.paymentInstructions?.trim() ?? '',
     notes: invoice.notes?.trim() ?? '',
@@ -142,3 +156,43 @@ export function buildView(invoice, settings, today) {
   };
 }
 
+/** A receipt for one recorded payment, with what was paid before and after it. */
+export function buildReceipt(invoice, settings, paymentId) {
+  const totals = computeTotals(invoice);
+  const money = (m) => formatMoney(m, invoice.currency);
+  const index = totals.paymentList.findIndex((p) => p.id === paymentId);
+  const payment = (invoice.payments ?? [])[index];
+  const amount = totals.paymentList[index].amount;
+  const before = totals.paymentList.slice(0, index).reduce((sum, p) => sum + p.amount, 0);
+  const toDate = before + amount;
+  const remaining = Math.max(totals.total - toDate, 0);
+  const purpose = totals.advance > 0 && before < totals.advance
+    ? `Advance payment (${pctText(totals.advancePercent)})`
+    : remaining <= 0 ? 'Final payment' : 'Part payment';
+  const { fromLines, toLines } = partyLines(invoice.from, invoice.to);
+
+  return {
+    number: `${invoice.number}-R${index + 1}`,
+    brandName: invoice.from?.brandName || 'Cybervex Digital',
+    logoVariant: settings.logoVariant === 'silver' ? 'silver' : 'black',
+    fromLines,
+    toLines,
+    meta: [
+      { label: 'Date received', text: formatDate(payment.date) },
+      { label: 'Payment method', text: payment.method || '—' },
+      { label: 'Reference', text: payment.reference || '—' },
+      { label: 'For invoice', text: invoice.number },
+    ],
+    purpose,
+    amount: money(amount),
+    summary: [
+      { label: 'Invoice total', value: money(totals.total) },
+      ...(before > 0 ? [{ label: 'Received earlier', value: money(before) }] : []),
+      { label: 'This payment', value: money(amount) },
+      { label: 'Total received to date', value: money(toDate) },
+    ],
+    remaining: { label: remaining > 0 ? 'Balance remaining' : 'Paid in full', value: money(remaining) },
+    tagline: settings.tagline || '',
+    website: invoice.from?.website?.trim() || 'cybervexdigital.com',
+  };
+}

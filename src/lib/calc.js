@@ -95,6 +95,7 @@ export function computeTotals(invoice) {
     chargeTotal: num(chargeTotal),
     total: num(total),
     paid: num(paid),
+    paymentList: payments.map((p) => ({ id: p.id, amount: num(p.amount) })),
     balance: num(total - paid),
     advancePercent: advance > 0n ? Number(advancePct) / Number(PCT_UNIT) : 0,
     finalPercent: advance > 0n ? Number(100n * PCT_UNIT - advancePct) / Number(PCT_UNIT) : 100,

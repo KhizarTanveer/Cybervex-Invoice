@@ -13,6 +13,27 @@ export const STATUS = {
   void: { label: 'Void' },
 };
 
+/**
+ * What the client owes next on an open invoice: the unpaid advance first,
+ * then the remaining balance. Advances without a picked date are due on issue.
+ */
+export function pendingPayment(invoice, totals) {
+  if (totals.advanceOutstanding > 0) {
+    return {
+      kind: 'advance',
+      label: 'Advance',
+      amount: totals.advanceOutstanding,
+      date: advanceDate(invoice.advance) || invoice.issueDate,
+    };
+  }
+  return {
+    kind: 'balance',
+    label: totals.paid > 0 ? 'Balance' : 'Full amount',
+    amount: Math.max(totals.balance, 0),
+    date: invoice.dueDate,
+  };
+}
+
 export function deriveStatus(invoice, totals, today = todayISO()) {
   if (invoice.state === 'void') return 'void';
   if (invoice.state !== 'issued') return 'draft';

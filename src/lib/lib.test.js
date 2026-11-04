@@ -167,6 +167,38 @@ describe('advance payment', () => {
   });
 });
 
+describe('pending payments', () => {
+  it('asks for the unpaid advance first, then the balance', async () => {
+    const { pendingPayment } = await import('./status');
+    const base = inv({ budget: '1000', issueDate: '2026-11-01', dueDate: '2026-12-01', advance: { enabled: true, percent: '40', when: 'receipt' } });
+    expect(pendingPayment(base, computeTotals(base))).toMatchObject({ kind: 'advance', amount: 400, date: '2026-11-01' });
+    const paid = { ...base, payments: [{ id: 'p', amount: '400' }] };
+    expect(pendingPayment(paid, computeTotals(paid))).toMatchObject({ kind: 'balance', label: 'Balance', amount: 600, date: '2026-12-01' });
+  });
+
+  it('builds a balance invoice that deducts the advance', async () => {
+    const { buildView } = await import('./view');
+    const base = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'issued', dueDate: '2999-01-01', discount: { type: 'percent', value: '' }, advance: { enabled: true, percent: '50', when: 'receipt' }, payments: [{ id: 'p', amount: '500' }] };
+    const v = buildView(base, {}, undefined, { balance: true });
+    expect(v.docType).toBe('Balance invoice');
+    expect(v.after).toEqual([{ label: 'Advance received (50%)', value: '−$500' }]);
+    expect(v.due).toEqual({ label: 'Balance due', value: '$500' });
+  });
+
+  it('builds a receipt per payment with running totals', async () => {
+    const { buildReceipt } = await import('./view');
+    const base = { number: 'CVD-1', currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, discount: { type: 'percent', value: '' }, advance: { enabled: true, percent: '30', when: 'receipt' },
+      payments: [{ id: 'a', amount: '300', date: '2026-11-01', method: 'Bank transfer' }, { id: 'b', amount: '700', date: '2026-11-20', method: 'Cash' }] };
+    const first = buildReceipt(base, {}, 'a');
+    expect(first.number).toBe('CVD-1-R1');
+    expect(first.purpose).toBe('Advance payment (30%)');
+    expect(first.remaining.value).toBe('$700');
+    const second = buildReceipt(base, {}, 'b');
+    expect(second.purpose).toBe('Final payment');
+    expect(second.remaining.label).toBe('Paid in full');
+  });
+});
+
 describe('numbering', () => {
   const list = [{ id: '1', number: 'CVD-2026-0001' }, { id: '2', number: 'CVD-2026-0007' }, { id: '3', number: 'CVD-2025-0042' }];
   it('continues the series for the year', () => {

@@ -159,6 +159,17 @@ const s = StyleSheet.create({
     borderTopColor: LINE,
   },
   bottomCol: { flex: 1 },
+  receiptHero: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 6 * MM,
+    padding: 6 * MM,
+    borderWidth: 1,
+    borderColor: INK,
+  },
+  receiptAmount: { fontSize: 26, lineHeight: 1, fontWeight: 600, color: INK },
+  receiptPurpose: { fontSize: 8, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', color: INK },
   gap: { marginTop: 2 * MM },
   foot: {
     position: 'absolute',
@@ -245,6 +256,11 @@ export function InvoicePdfDocument({ view }) {
           <View style={s.titleBox}>
             <Text style={s.title}>INVOICE</Text>
             <Text style={s.number}>{view.number}</Text>
+            {view.docType ? (
+              <View style={[s.status, { backgroundColor: INK }]}>
+                <Text style={[s.statusText, { color: '#fff' }]}>{view.docType}</Text>
+              </View>
+            ) : null}
             {view.showStatus && (
               <View style={[s.status, statusBox]}>
                 <Text style={[s.statusText, statusColor]}>{view.statusLabel}</Text>
@@ -320,4 +336,62 @@ export function InvoicePdfDocument({ view }) {
 
 export async function renderInvoicePdf(view) {
   return pdf(<InvoicePdfDocument view={view} />).toBlob();
+}
+
+export function ReceiptPdfDocument({ receipt }) {
+  return (
+    <Document title={`Receipt ${receipt.number}`} author={receipt.brandName} creator={receipt.brandName} producer={receipt.brandName}>
+      <Page size="A4" style={s.page}>
+        <View style={s.head}>
+          <Image style={s.logo} src={asset(`brand/cybervex-logo-${receipt.logoVariant}.png`)} />
+          <View style={s.titleBox}>
+            <Text style={s.title}>RECEIPT</Text>
+            <Text style={s.number}>{receipt.number}</Text>
+            <View style={[s.status, { backgroundColor: INK }]}>
+              <Text style={[s.statusText, { color: '#fff' }]}>Payment received</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={s.parties}>
+          <Party title="Received from" lines={receipt.toLines} style={{ marginRight: 6 * MM }} />
+          <Party title="Received by" lines={receipt.fromLines} style={{ marginLeft: 6 * MM }} />
+        </View>
+
+        <Grid cells={receipt.meta} />
+
+        <View style={s.receiptHero} wrap={false}>
+          <View>
+            <Text style={s.label}>Amount received</Text>
+            <Text style={s.receiptAmount}>{receipt.amount}</Text>
+          </View>
+          <Text style={s.receiptPurpose}>{receipt.purpose}</Text>
+        </View>
+
+        <View style={[s.summary, { marginTop: 6 * MM }]} wrap={false}>
+          {receipt.summary.map((r) => (
+            <View key={r.label} style={s.sumRow}>
+              <Text>{r.label}</Text>
+              <Text style={s.sumValue}>{r.value}</Text>
+            </View>
+          ))}
+          <View style={s.due}>
+            <Text style={s.dueLabel}>{receipt.remaining.label}</Text>
+            <Text style={s.dueValue}>{receipt.remaining.value}</Text>
+          </View>
+        </View>
+
+        <View style={s.bottom} wrap={false}>
+          <Text>Thank you for your payment. Please keep this receipt for your records.</Text>
+        </View>
+
+        <Text style={[s.foot, { textAlign: 'left' }]} fixed>{receipt.tagline}</Text>
+        <Text style={[s.foot, { textAlign: 'right' }]} fixed>{receipt.website}</Text>
+      </Page>
+    </Document>
+  );
+}
+
+export async function renderReceiptPdf(receipt) {
+  return pdf(<ReceiptPdfDocument receipt={receipt} />).toBlob();
 }
