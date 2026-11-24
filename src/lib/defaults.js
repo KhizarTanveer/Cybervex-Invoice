@@ -31,7 +31,10 @@ export const DEFAULT_SETTINGS = {
   counters: {},
 };
 
-export const emptyService = (custom = false) => ({ id: uid(), name: '', ...(custom ? { custom: true } : {}) });
+export const emptyService = () => ({ id: uid(), name: '' });
+
+/** How a service is billed; shown beside its name on the document. Unset shows nothing. */
+export const BILLING = { once: 'One-time', monthly: 'Monthly' };
 
 /**
  * Upgrade invoices saved by earlier versions:

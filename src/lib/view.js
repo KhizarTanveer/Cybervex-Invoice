@@ -1,5 +1,5 @@
 import { computeTotals } from './calc';
-import { advanceWhenLabel } from './defaults';
+import { BILLING, advanceWhenLabel } from './defaults';
 import { formatDate, termsLabel } from './dates';
 import { formatDecimal, formatMoney } from './money';
 import { STATUS, deriveStatus } from './status';
@@ -62,7 +62,10 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
       id: sv.id,
       text: sv.name.trim(),
       items: (sv.items ?? []).map((it) => it.text?.trim()).filter(Boolean),
-      ...(totals.services[sv.id] > 0 ? { price: money(totals.services[sv.id]) } : {}),
+      ...(BILLING[sv.billing] ? { billing: { kind: sv.billing, label: BILLING[sv.billing] } } : {}),
+      ...(totals.services[sv.id] > 0
+        ? { price: money(totals.services[sv.id]), ...(sv.billing === 'monthly' ? { per: '/ month' } : {}) }
+        : {}),
     }))
     : [{ id: 'ph', ...ph('', 'Service') }];
   const reference = invoice.reference?.trim()

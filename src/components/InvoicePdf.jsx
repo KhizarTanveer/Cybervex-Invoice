@@ -97,11 +97,30 @@ const s = StyleSheet.create({
   },
   bullet: { width: 4, height: 4, borderRadius: 2, backgroundColor: INK, marginTop: 4.6, marginLeft: 1.7, marginRight: 9 },
   svcBody: { flex: 1 },
+  svcHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   svcName: { color: INK, fontWeight: 500 },
+  // Billing tag: outlined for one-time, solid ink for monthly (matches the on-screen document).
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 4.4 * MM,
+    marginLeft: 2.8 * MM,
+    paddingLeft: 2 * MM,
+    paddingRight: 2.2 * MM - 1.1,
+    borderWidth: 0.75,
+    borderColor: INK,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+  },
+  tagSolid: { backgroundColor: INK },
+  tagDotRing: { width: 1.3 * MM, height: 1.3 * MM, borderRadius: 999, borderWidth: 0.75, borderColor: INK, marginRight: 1.3 * MM },
+  tagDotSolid: { width: 1.3 * MM, height: 1.3 * MM, borderRadius: 999, backgroundColor: '#fff', marginRight: 1.3 * MM },
+  tagText: { fontSize: 5.6, lineHeight: 1, fontWeight: 600, letterSpacing: 1.1, color: INK },
   svcItem: { flexDirection: 'row', marginTop: 1.4 },
   svcDash: { width: 3.6 * MM, color: MUTED },
   svcItemText: { flex: 1, color: BODY, fontSize: 8.05 },
   svcPrice: { marginLeft: 6 * MM, color: INK, fontWeight: 600 },
+  per: { fontSize: 7, fontWeight: 400, color: MUTED },
   money: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 * MM },
   schedule: { flex: 1, marginRight: 10 * MM },
   split: { flexDirection: 'row', height: 1.6 * MM, marginBottom: 1 * MM },
@@ -288,7 +307,15 @@ export function InvoicePdfDocument({ view }) {
           <View key={sv.id} style={s.svcRow} wrap={false}>
             <View style={s.bullet} />
             <View style={s.svcBody}>
-              <P part={sv} style={s.svcName} />
+              <View style={s.svcHead}>
+                <P part={sv} style={s.svcName} />
+                {sv.billing ? (
+                  <View style={[s.tag, sv.billing.kind === 'monthly' ? s.tagSolid : null]}>
+                    <View style={sv.billing.kind === 'monthly' ? s.tagDotSolid : s.tagDotRing} />
+                    <Text style={[s.tagText, sv.billing.kind === 'monthly' ? { color: '#fff' } : null]}>{sv.billing.label.toUpperCase()}</Text>
+                  </View>
+                ) : null}
+              </View>
               {(sv.items ?? []).map((t, k) => (
                 <View key={k} style={s.svcItem}>
                   <Text style={s.svcDash}>–</Text>
@@ -296,7 +323,12 @@ export function InvoicePdfDocument({ view }) {
                 </View>
               ))}
             </View>
-            {sv.price ? <Text style={s.svcPrice}>{sv.price}</Text> : null}
+            {sv.price ? (
+              <Text style={s.svcPrice}>
+                {sv.price}
+                {sv.per ? <Text style={s.per}>{` ${sv.per}`}</Text> : null}
+              </Text>
+            ) : null}
           </View>
         ))}
 

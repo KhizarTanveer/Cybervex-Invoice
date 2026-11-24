@@ -99,13 +99,18 @@ export default function InvoiceDocument({ view }) {
             <li key={sv.id}>
               <div className="iv-svc-body">
                 <Text part={sv} />
+                {sv.billing && (
+                  <span className={`iv-tag iv-tag-${sv.billing.kind}`}><i aria-hidden />{sv.billing.label}</span>
+                )}
                 {sv.items?.length > 0 && (
                   <ul className="iv-svc-items">
                     {sv.items.map((t, k) => <li key={k}>{t}</li>)}
                   </ul>
                 )}
               </div>
-              {sv.price && <span className="iv-svc-price">{sv.price}</span>}
+              {sv.price && (
+                <span className="iv-svc-price">{sv.price}{sv.per && <span className="iv-per">{sv.per}</span>}</span>
+              )}
             </li>
           ))}
         </ul>

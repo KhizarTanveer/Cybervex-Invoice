@@ -137,6 +137,30 @@
 }
 
 .iv-svc-body { flex: 1; min-width: 0; }
+/* Billing tag beside a service name: outlined for one-time, solid ink for monthly. */
+.iv-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.3mm;
+  height: 4.4mm;
+  margin-left: 2.8mm;
+  /* The right padding is trimmed by the tracking so the text sits centred. */
+  padding: 0 calc(2.2mm - 0.2em) 0 2mm;
+  border: 0.75pt solid var(--iv-ink);
+  border-radius: 999px;
+  font-size: 5.6pt;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: 0.12em;
+}
+.iv-tag i { flex: none; width: 1.3mm; height: 1.3mm; border-radius: 50%; }
+.iv-tag-once { color: var(--iv-ink); background: #fff; }
+.iv-tag-once i { border: 0.75pt solid var(--iv-ink); }
+.iv-tag-monthly { color: #fff; background: var(--iv-ink); }
+.iv-tag-monthly i { background: #fff; }
 .iv-services .iv-svc-items { margin-top: 1.2mm; display: grid; gap: 0.6mm; }
 .iv-svc-items li {
   position: relative;
@@ -148,6 +172,7 @@
 .iv-svc-items li::before { content: '–'; position: absolute; left: 0; color: var(--iv-muted); }
 
 .iv-svc-price { flex: none; font-weight: 600; white-space: nowrap; }
+.iv-per { margin-left: 0.25em; font-size: 0.8em; font-weight: 400; color: var(--iv-muted); }
 
 /* Summary, with the optional payment schedule to its left */
 .iv-money {

@@ -9,11 +9,10 @@ import {
   DEFAULT_QUOTE_VALIDITY, PAYMENT_TERMS, QUOTE_VALIDITY_DAYS, addDays, daysBetween, dueDateForTerms,
   formatDate, isValidISO, termLabelFor, todayISO,
 } from '../lib/dates';
-import { ADVANCE_WHEN, advanceWhenLabel, duplicateInvoice, emptyService, newAdvance, newInvoice, normalizeInvoice, uid } from '../lib/defaults';
+import { ADVANCE_WHEN, BILLING, advanceWhenLabel, duplicateInvoice, emptyService, newAdvance, newInvoice, normalizeInvoice, uid } from '../lib/defaults';
 import { currencyOptions, formatDecimal, formatMoney, minorToInput, toMinor } from '../lib/money';
 import { isDuplicateNumber, nextInvoiceNumber } from '../lib/numbering';
 import { navigate, setNavigationGuard } from '../lib/router';
-import { CATEGORY_NAMES, SERVICE_CATALOG, SERVICE_NAMES } from '../lib/services';
 import { deleteInvoice, getState, saveInvoice, useStore } from '../lib/storage';
 import { buildReceipt, buildView } from '../lib/view';
 
@@ -55,7 +54,6 @@ function issueProblems(inv, totals, invoices) {
   return p;
 }
 
-const isCustom = (sv) => sv.custom || (sv.name.trim() && !SERVICE_NAMES.has(sv.name));
 
 function safeFilename(s) {
   return s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -174,24 +172,6 @@ export default function EditorPage({ id }) {
     else if (d.terms !== 'custom') {
       d.terms = 'custom';
       d.customTerms = 'Due by date shown';
-    }
-    return d;
-  });
-
-  // Complete services (the 23 categories) are toggled with checkboxes.
-  const chosenCategories = new Set(draft.services.map((sv) => sv.name).filter((n) => CATEGORY_NAMES.has(n)));
-  const allCategories = chosenCategories.size === CATEGORY_NAMES.size;
-  const toggleCategory = (name) => update((d) => {
-    d.services = d.services.some((sv) => sv.name === name)
-      ? d.services.filter((sv) => sv.name !== name)
-      : [...d.services, { id: uid(), name }];
-    return d;
-  });
-  const toggleAllCategories = () => update((d) => {
-    if (allCategories) d.services = d.services.filter((sv) => !CATEGORY_NAMES.has(sv.name));
-    else {
-      const have = new Set(d.services.map((sv) => sv.name));
-      for (const g of SERVICE_CATALOG) if (!have.has(g.category)) d.services.push({ id: uid(), name: g.category });
     }
     return d;
   });
@@ -438,63 +418,25 @@ export default function EditorPage({ id }) {
 
           <section className="section">
             <div className="section-head"><h2>Services</h2></div>
-            <p className="section-note">Tick complete services, add specific ones from the list, or type a new one. Each appears as its own line on the invoice.</p>
+            <p className="section-note">Type each service and what it includes. Each appears as its own line on the invoice, with its points underneath.</p>
 
-            <div className="subhead">
-              <span>Complete services</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={toggleAllCategories}>
-                {allCategories ? 'Clear all' : `Select all ${CATEGORY_NAMES.size}`}
-              </button>
-            </div>
-            <div className="svc-cats">
-              {SERVICE_CATALOG.map((g, n) => (
-                <label key={g.category} className="check">
-                  <input type="checkbox" checked={chosenCategories.has(g.category)} onChange={() => toggleCategory(g.category)} />
-                  <span><span className="muted">{String(n + 1).padStart(2, '0')}.</span> {g.category}</span>
-                </label>
-              ))}
-            </div>
-            {draft.services.filter((sv) => CATEGORY_NAMES.has(sv.name)).map((sv) => (
-              <div className="svc-block" key={sv.id}>
-                <div className="svc-block-head">
-                  <strong>{sv.name}</strong>
-                  <button type="button" className="icon-btn" aria-label={`Remove ${sv.name}`} onClick={() => removeListItem('services', sv.id)}><X /></button>
-                </div>
-                <ServiceItems sv={sv} n={sv.name}
-                  onChange={(items) => setListItem('services', sv.id, 'items', items)} />
-              </div>
-            ))}
-
-            <div className="subhead"><span>Specific &amp; custom services</span></div>
-            {draft.services.filter((sv) => !CATEGORY_NAMES.has(sv.name)).map((sv, i) => (
+            {draft.services.map((sv, i) => (
               <div className="sub-row service-row" key={sv.id}>
-                {isCustom(sv) ? (
-                  <Field label={`Custom service ${i + 1}`} value={sv.name} placeholder="Type the service name" autoFocus={!sv.name}
-                    onChange={(e) => setListItem('services', sv.id, 'name', e.target.value)} />
-                ) : (
-                  <Field label={`Service ${i + 1}`}>
-                    <select value={sv.name} onChange={(e) => setListItem('services', sv.id, 'name', e.target.value)}>
-                      <option value="">Select a service…</option>
-                      {SERVICE_CATALOG.map((g, n) => (
-                        <optgroup key={g.category} label={`${String(n + 1).padStart(2, '0')}. ${g.category}`}>
-                          {g.services.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </Field>
-                )}
+                <Field label={`Service ${i + 1}`} value={sv.name} placeholder="Type the service name" autoFocus={!sv.name && i > 0}
+                  onChange={(e) => setListItem('services', sv.id, 'name', e.target.value)} />
+                <Field label="Billing">
+                  <select value={sv.billing ?? ''} onChange={(e) => setListItem('services', sv.id, 'billing', e.target.value)}>
+                    <option value="">Not shown</option>
+                    {Object.entries(BILLING).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                  </select>
+                </Field>
                 <button type="button" className="icon-btn" aria-label={`Remove service ${i + 1}`} onClick={() => removeListItem('services', sv.id)}><X /></button>
-                {(isCustom(sv) || sv.name) && (
-                  <ServiceItems sv={sv} n={i + 1} onChange={(items) => setListItem('services', sv.id, 'items', items)} />
-                )}
+                <ServiceItems sv={sv} n={i + 1} onChange={(items) => setListItem('services', sv.id, 'items', items)} />
               </div>
             ))}
             <div className="toolbar">
               <button type="button" className="btn" onClick={() => update((d) => { d.services.push(emptyService()); return d; })}>
                 <Plus aria-hidden /> Add service
-              </button>
-              <button type="button" className="btn" onClick={() => update((d) => { d.services.push(emptyService(true)); return d; })}>
-                <Plus aria-hidden /> Add custom service
               </button>
             </div>
             {draft.services.some((sv) => sv.name.trim()) && (
