@@ -97,7 +97,14 @@ export default function InvoiceDocument({ view }) {
         <ul>
           {view.services.map((sv) => (
             <li key={sv.id}>
-              <Text part={sv} />
+              <div className="iv-svc-body">
+                <Text part={sv} />
+                {sv.items?.length > 0 && (
+                  <ul className="iv-svc-items">
+                    {sv.items.map((t, k) => <li key={k}>{t}</li>)}
+                  </ul>
+                )}
+              </div>
               {sv.price && <span className="iv-svc-price">{sv.price}</span>}
             </li>
           ))}

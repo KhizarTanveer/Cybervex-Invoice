@@ -184,6 +184,13 @@ describe('pending payments', () => {
     expect(buildView({ ...base, kind: 'quotation' }, {}, undefined, { balance: true }).title).toBe('Invoice');
   });
 
+  it('lists what a service includes under it, skipping blank points', async () => {
+    const { buildView } = await import('./view');
+    const base = { currency: 'USD', budget: '1000', taxes: [], charges: [], from: {}, to: {}, state: 'draft', discount: { type: 'percent', value: '' }, payments: [] };
+    const v = buildView({ ...base, services: [{ id: 's', name: 'Website', custom: true, items: [{ id: 'a', text: ' 5 pages ' }, { id: 'b', text: '' }, { id: 'c', text: 'SEO setup' }] }] }, {});
+    expect(v.services[0].items).toEqual(['5 pages', 'SEO setup']);
+  });
+
   it('treats a quotation date as validity, not a payment deadline', async () => {
     const { buildView } = await import('./view');
     const q = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'issued', kind: 'quotation', terms: 'net15', issueDate: '2026-11-01', dueDate: '2026-11-16', discount: { type: 'percent', value: '' }, payments: [] };

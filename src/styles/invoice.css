@@ -112,7 +112,7 @@
   border-bottom: 1px solid var(--iv-ink);
 }
 .iv-services ul { list-style: none; margin: 0; padding: 0; }
-.iv-services li {
+.iv-services > ul > li {
   position: relative;
   display: flex;
   justify-content: space-between;
@@ -125,7 +125,7 @@
   break-inside: avoid;
   page-break-inside: avoid;
 }
-.iv-services li::before {
+.iv-services > ul > li::before {
   content: '';
   position: absolute;
   left: 0.6mm;
@@ -135,6 +135,17 @@
   border-radius: 50%;
   background: var(--iv-ink);
 }
+
+.iv-svc-body { flex: 1; min-width: 0; }
+.iv-services .iv-svc-items { margin-top: 1.2mm; display: grid; gap: 0.6mm; }
+.iv-svc-items li {
+  position: relative;
+  padding-left: 3.6mm;
+  color: var(--iv-body);
+  font-weight: 400;
+  font-size: 0.92em;
+}
+.iv-svc-items li::before { content: '–'; position: absolute; left: 0; color: var(--iv-muted); }
 
 .iv-svc-price { flex: none; font-weight: 600; white-space: nowrap; }
 

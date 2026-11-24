@@ -474,6 +474,9 @@ export default function EditorPage({ id }) {
                   </Field>
                 )}
                 <button type="button" className="icon-btn" aria-label={`Remove service ${i + 1}`} onClick={() => removeListItem('services', sv.id)}><X /></button>
+                {isCustom(sv) && (
+                  <ServiceItems sv={sv} n={i + 1} onChange={(items) => setListItem('services', sv.id, 'items', items)} />
+                )}
               </div>
             ))}
             <div className="toolbar">
@@ -613,6 +616,37 @@ export default function EditorPage({ id }) {
       {createPortal(<div className="print-only"><InvoiceDocument view={view} /></div>, document.body)}
       {toastNode}
     </>
+  );
+}
+
+/** What a custom service includes: each point prints as a sub-line under it. */
+function ServiceItems({ sv, n, onChange }) {
+  const items = sv.items ?? [];
+  const [focusId, setFocusId] = useState(null);
+  const add = () => {
+    const id = uid();
+    setFocusId(id);
+    onChange([...items, { id, text: '' }]);
+  };
+  const set = (id, text) => onChange(items.map((it) => (it.id === id ? { ...it, text } : it)));
+  const remove = (id) => onChange(items.filter((it) => it.id !== id));
+
+  return (
+    <div className="svc-items">
+      {items.length > 0 && <span className="svc-items-label">What’s included</span>}
+      {items.map((it, k) => (
+        <div className="svc-item" key={it.id}>
+          <input value={it.text} placeholder="e.g. 5 pages, mobile responsive" autoFocus={it.id === focusId}
+            aria-label={`Service ${n}, included item ${k + 1}`}
+            onChange={(e) => set(it.id, e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
+          <button type="button" className="icon-btn" aria-label={`Remove included item ${k + 1}`} onClick={() => remove(it.id)}><X /></button>
+        </div>
+      ))}
+      <button type="button" className="btn btn-ghost btn-sm" onClick={add}>
+        <Plus aria-hidden /> {items.length ? 'Add another' : 'Add what’s included'}
+      </button>
+    </div>
   );
 }
 

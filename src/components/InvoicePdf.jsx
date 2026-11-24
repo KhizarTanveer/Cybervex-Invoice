@@ -96,7 +96,11 @@ const s = StyleSheet.create({
     borderBottomColor: LINE,
   },
   bullet: { width: 4, height: 4, borderRadius: 2, backgroundColor: INK, marginTop: 4.6, marginLeft: 1.7, marginRight: 9 },
-  svcText: { flex: 1, color: INK, fontWeight: 500 },
+  svcBody: { flex: 1 },
+  svcName: { color: INK, fontWeight: 500 },
+  svcItem: { flexDirection: 'row', marginTop: 1.4 },
+  svcDash: { width: 3.6 * MM, color: MUTED },
+  svcItemText: { flex: 1, color: BODY, fontSize: 8.05 },
   svcPrice: { marginLeft: 6 * MM, color: INK, fontWeight: 600 },
   money: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 5 * MM },
   schedule: { flex: 1, marginRight: 10 * MM },
@@ -283,7 +287,15 @@ export function InvoicePdfDocument({ view }) {
         {view.services.map((sv) => (
           <View key={sv.id} style={s.svcRow} wrap={false}>
             <View style={s.bullet} />
-            <P part={sv} style={s.svcText} />
+            <View style={s.svcBody}>
+              <P part={sv} style={s.svcName} />
+              {(sv.items ?? []).map((t, k) => (
+                <View key={k} style={s.svcItem}>
+                  <Text style={s.svcDash}>–</Text>
+                  <Text style={s.svcItemText}>{t}</Text>
+                </View>
+              ))}
+            </View>
             {sv.price ? <Text style={s.svcPrice}>{sv.price}</Text> : null}
           </View>
         ))}

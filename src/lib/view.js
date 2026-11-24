@@ -61,6 +61,7 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
     ? named.map((sv) => ({
       id: sv.id,
       text: sv.name.trim(),
+      items: (sv.items ?? []).map((it) => it.text?.trim()).filter(Boolean),
       ...(totals.services[sv.id] > 0 ? { price: money(totals.services[sv.id]) } : {}),
     }))
     : [{ id: 'ph', ...ph('', 'Service') }];
