@@ -454,6 +454,16 @@ export default function EditorPage({ id }) {
                 </label>
               ))}
             </div>
+            {draft.services.filter((sv) => CATEGORY_NAMES.has(sv.name)).map((sv) => (
+              <div className="svc-block" key={sv.id}>
+                <div className="svc-block-head">
+                  <strong>{sv.name}</strong>
+                  <button type="button" className="icon-btn" aria-label={`Remove ${sv.name}`} onClick={() => removeListItem('services', sv.id)}><X /></button>
+                </div>
+                <ServiceItems sv={sv} n={sv.name}
+                  onChange={(items) => setListItem('services', sv.id, 'items', items)} />
+              </div>
+            ))}
 
             <div className="subhead"><span>Specific &amp; custom services</span></div>
             {draft.services.filter((sv) => !CATEGORY_NAMES.has(sv.name)).map((sv, i) => (
@@ -474,7 +484,7 @@ export default function EditorPage({ id }) {
                   </Field>
                 )}
                 <button type="button" className="icon-btn" aria-label={`Remove service ${i + 1}`} onClick={() => removeListItem('services', sv.id)}><X /></button>
-                {isCustom(sv) && (
+                {(isCustom(sv) || sv.name) && (
                   <ServiceItems sv={sv} n={i + 1} onChange={(items) => setListItem('services', sv.id, 'items', items)} />
                 )}
               </div>
