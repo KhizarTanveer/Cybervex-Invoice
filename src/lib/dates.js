@@ -50,10 +50,24 @@ export const PAYMENT_TERMS = [
   { value: 'custom', label: 'Custom', days: null },
 ];
 
-export function termsLabel(invoice) {
-  if (invoice.terms === 'custom') return invoice.customTerms?.trim() || 'Custom';
-  return PAYMENT_TERMS.find((t) => t.value === invoice.terms)?.label ?? '';
+/**
+ * A quotation states terms for the invoice that follows acceptance, so they
+ * count from that invoice, not from the quotation's own date.
+ */
+export function termLabelFor(term, quote = false) {
+  if (!quote || term.days === null) return term.label;
+  return term.days === 0 ? 'Due on receipt of invoice' : `${term.label} from invoice date`;
 }
+
+export function termsLabel(invoice, quote = false) {
+  if (invoice.terms === 'custom') return invoice.customTerms?.trim() || 'Custom';
+  const t = PAYMENT_TERMS.find((x) => x.value === invoice.terms);
+  return t ? termLabelFor(t, quote) : '';
+}
+
+/** How long a quotation's prices stand, in days from its issue date. */
+export const QUOTE_VALIDITY_DAYS = [7, 15, 30, 60];
+export const DEFAULT_QUOTE_VALIDITY = 15;
 
 export function dueDateForTerms(issueDate, terms) {
   const t = PAYMENT_TERMS.find((x) => x.value === terms);

@@ -184,6 +184,21 @@ describe('pending payments', () => {
     expect(buildView({ ...base, kind: 'quotation' }, {}, undefined, { balance: true }).title).toBe('Invoice');
   });
 
+  it('treats a quotation date as validity, not a payment deadline', async () => {
+    const { buildView } = await import('./view');
+    const q = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'issued', kind: 'quotation', terms: 'net15', issueDate: '2026-11-01', dueDate: '2026-11-16', discount: { type: 'percent', value: '' }, payments: [] };
+    const v = buildView(q, {}, '2026-11-10');
+    expect(v.meta.find((m) => m.label === 'Valid until').text).toBe('16 Nov 2026');
+    expect(v.meta.find((m) => m.label === 'Payment terms').text).toBe('Net 15 from invoice date');
+    expect(v.termsLine).toBe('Net 15 from invoice date. This quotation is valid until 16 Nov 2026.');
+    expect(v.due.label).toBe('Quoted total');
+    expect(v.status).toBe('quoted');
+    expect(v.showStatus).toBe(false);
+    expect(deriveStatus(q, computeTotals(q), '2026-11-20')).toBe('expired');
+    const accepted = { ...q, payments: [{ id: 'p', amount: '400' }] };
+    expect(deriveStatus(accepted, computeTotals(accepted), '2026-11-20')).toBe('partial');
+  });
+
   it('builds a balance invoice that deducts the advance', async () => {
     const { buildView } = await import('./view');
     const base = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'issued', dueDate: '2999-01-01', discount: { type: 'percent', value: '' }, advance: { enabled: true, percent: '50', when: 'receipt' }, payments: [{ id: 'p', amount: '500' }] };

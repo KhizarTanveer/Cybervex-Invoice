@@ -46,10 +46,13 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
   const { from = {}, to = {} } = invoice;
   const { fromLines, toLines } = partyLines(from, to);
 
+  // On a quotation the "due date" is how long the offer stands, not a payment deadline.
+  const quote = invoice.kind === 'quotation' && !balance;
+
   const meta = [
     { label: 'Issue date', ...ph(formatDate(invoice.issueDate), 'Date') },
-    { label: 'Due date', ...ph(formatDate(invoice.dueDate), 'Date') },
-    { label: 'Payment terms', ...ph(termsLabel(invoice), 'Terms') },
+    { label: quote ? 'Valid until' : 'Due date', ...ph(formatDate(invoice.dueDate), 'Date') },
+    { label: 'Payment terms', ...ph(termsLabel(invoice, quote), 'Terms') },
     { label: 'Currency', text: invoice.currency },
   ];
 
@@ -113,26 +116,28 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
         title: 'Final payment',
         share: totals.finalPercent,
         percent: pctText(totals.finalPercent),
-        ...stage(totals.finalPayment, totals.finalPaid, formatDate(invoice.dueDate) ? `Due by ${formatDate(invoice.dueDate)}` : 'Due on completion'),
+        ...stage(totals.finalPayment, totals.finalPaid, !quote && formatDate(invoice.dueDate) ? `Due by ${formatDate(invoice.dueDate)}` : 'Due on completion'),
       },
     ]
     : null;
   const advanceOpen = !balance && totals.advanceOutstanding > 0 && status !== 'void';
 
-  const terms = termsLabel(invoice);
+  const terms = termsLabel(invoice, quote);
   const dueText = formatDate(invoice.dueDate);
-  const termsLine = terms && dueText
-    ? `${terms}. Payment due by ${dueText}.`
-    : terms || '';
+  const termsLine = quote
+    ? [terms && `${terms}.`, dueText && `This quotation is valid until ${dueText}.`].filter(Boolean).join(' ')
+    : terms && dueText
+      ? `${terms}. Payment due by ${dueText}.`
+      : terms || '';
 
   return {
     // Same document either way; only the heading changes. A balance invoice is always an invoice.
-    title: invoice.kind === 'quotation' && !balance ? 'Quotation' : 'Invoice',
+    title: quote ? 'Quotation' : 'Invoice',
     number: invoice.number,
     status,
     statusLabel: STATUS[status].label,
     // Drafts and unpaid invoices carry no label on the document itself.
-    showStatus: !balance && status !== 'unpaid' && status !== 'draft',
+    showStatus: !balance && !['unpaid', 'draft', 'quoted', 'expired'].includes(status),
     docType: balance ? 'Balance invoice' : '',
     brandName: from.brandName || 'Cybervex Digital',
     logoVariant: settings.logoVariant === 'silver' ? 'silver' : 'black',
@@ -145,9 +150,14 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
     total: { label: 'Total', value: money(totals.total) },
     after,
     schedule,
-    due: advanceOpen
-      ? { label: `Advance due now · ${pctText(totals.advancePercent)}`, value: money(totals.advanceOutstanding) }
-      : { label: balance || totals.paid > 0 ? 'Balance due' : 'Total due', value: money(Math.max(totals.balance, 0)) },
+    // A quotation asks for nothing yet: it shows what accepting it would take.
+    due: quote && totals.paid <= 0
+      ? advanceOpen
+        ? { label: `Advance to confirm · ${pctText(totals.advancePercent)}`, value: money(totals.advanceOutstanding) }
+        : { label: 'Quoted total', value: money(Math.max(totals.balance, 0)) }
+      : advanceOpen
+        ? { label: `Advance due now · ${pctText(totals.advancePercent)}`, value: money(totals.advanceOutstanding) }
+        : { label: balance || totals.paid > 0 ? 'Balance due' : 'Total due', value: money(Math.max(totals.balance, 0)) },
     paymentDetails: lines(invoice.paymentDetails, 'Add verified bank or payment details'),
     paymentInstructions: invoice.paymentInstructions?.trim() ?? '',
     notes: invoice.notes?.trim() ?? '',

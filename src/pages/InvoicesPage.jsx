@@ -8,7 +8,7 @@ import { STATUS, deriveStatus, pendingPayment } from '../lib/status';
 import { useStore } from '../lib/storage';
 import { StatusBadge } from '../components/ui';
 
-const FILTERS = ['all', 'draft', 'unpaid', 'partial', 'advance', 'overdue', 'paid', 'void'];
+const FILTERS = ['all', 'draft', 'unpaid', 'partial', 'advance', 'overdue', 'quoted', 'expired', 'paid', 'void'];
 const FILTER_LABEL = { all: 'All', ...Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label])) };
 
 /** Sum per currency: invoices in different currencies are never added together. */

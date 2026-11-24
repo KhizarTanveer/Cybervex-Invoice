@@ -202,6 +202,8 @@ a.list-row:hover { background: #fbfbfa; }
 .badge-overdue { color: var(--danger); border-color: rgba(180, 35, 24, 0.35); }
 .badge-partial { color: var(--ink); }
 .badge-advance { color: var(--ink); border-color: var(--ink); }
+.badge-quoted { color: var(--ink); border-style: dashed; border-color: var(--ink); }
+.badge-expired { color: var(--faint); border-style: dashed; }
 .badge-void { color: var(--faint); text-decoration: line-through; }
 
 /* Editor */

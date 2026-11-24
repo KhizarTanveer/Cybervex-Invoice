@@ -1,4 +1,4 @@
-import { addDays, dueDateForTerms, formatDate, isValidISO, todayISO } from './dates';
+import { DEFAULT_QUOTE_VALIDITY, addDays, daysBetween, dueDateForTerms, formatDate, isValidISO, todayISO } from './dates';
 import { currencyDigits, divRound, minorToInput, parseScaled } from './money';
 
 export const uid = () =>
@@ -129,7 +129,11 @@ export function newInvoice(settings, number) {
 export function duplicateInvoice(original, number) {
   const source = normalizeInvoice(original);
   const issueDate = todayISO();
-  const due = dueDateForTerms(issueDate, source.terms);
+  // A copied quotation keeps its validity period; an invoice re-derives from its terms.
+  const span = daysBetween(source.issueDate, source.dueDate);
+  const due = source.kind === 'quotation'
+    ? addDays(issueDate, span !== null && span >= 0 ? span : DEFAULT_QUOTE_VALIDITY)
+    : dueDateForTerms(issueDate, source.terms);
   return {
     ...structuredClone(source),
     id: uid(),

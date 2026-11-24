@@ -5,7 +5,10 @@ import {
 } from 'lucide-react';
 import InvoiceDocument from '../components/InvoiceDocument';
 import { Field, Menu, ScaledPreview, StatusBadge, TextArea, flash, useToast } from '../components/ui';
-import { PAYMENT_TERMS, addDays, dueDateForTerms, formatDate, isValidISO, todayISO } from '../lib/dates';
+import {
+  DEFAULT_QUOTE_VALIDITY, PAYMENT_TERMS, QUOTE_VALIDITY_DAYS, addDays, daysBetween, dueDateForTerms,
+  formatDate, isValidISO, termLabelFor, todayISO,
+} from '../lib/dates';
 import { ADVANCE_WHEN, advanceWhenLabel, duplicateInvoice, emptyService, newAdvance, newInvoice, normalizeInvoice, uid } from '../lib/defaults';
 import { currencyOptions, formatDecimal, formatMoney, minorToInput, toMinor } from '../lib/money';
 import { isDuplicateNumber, nextInvoiceNumber } from '../lib/numbering';
@@ -35,15 +38,18 @@ function issueProblems(inv, totals, invoices) {
   if (blank(inv.to.company)) p.push('Client or company name');
   if (blank(inv.to.address)) p.push('Client billing address');
   if (!isValidISO(inv.issueDate)) p.push('A valid issue date');
-  if (!isValidISO(inv.dueDate) || inv.dueDate < inv.issueDate) p.push('A due date on or after the issue date');
+  if (!isValidISO(inv.dueDate) || inv.dueDate < inv.issueDate) p.push(inv.kind === 'quotation' ? 'A "valid until" date on or after the issue date' : 'A due date on or after the issue date');
   if (!inv.services.some((sv) => !blank(sv.name))) p.push('At least one service');
   if (Object.keys(totals.errors).length) p.push('Fix the highlighted amounts');
   else if (totals.subtotal <= 0) p.push('An overall budget (or service prices) greater than zero');
   if (totals.errors.advance) p.push('A valid advance percentage (or turn the advance off)');
   const adv = inv.advance;
   if (adv?.enabled && adv.when === 'date'
-    && (!isValidISO(adv.date) || adv.date < inv.issueDate || (isValidISO(inv.dueDate) && adv.date > inv.dueDate))) {
-    p.push('An advance due date between the issue date and the final payment date');
+    && (!isValidISO(adv.date) || adv.date < inv.issueDate
+      || (inv.kind !== 'quotation' && isValidISO(inv.dueDate) && adv.date > inv.dueDate))) {
+    p.push(inv.kind === 'quotation'
+      ? 'An advance due date on or after the issue date'
+      : 'An advance due date between the issue date and the final payment date');
   }
   if (blank(inv.paymentDetails) && blank(inv.paymentInstructions)) p.push('Payment details or payment instructions');
   return p;
@@ -123,7 +129,17 @@ export default function EditorPage({ id }) {
     update((d) => { d[list] = d[list].map((x) => (x.id === itemId ? { ...x, [key]: value } : x)); return d; });
   const removeListItem = (list, itemId) => update((d) => { d[list] = d[list].filter((x) => x.id !== itemId); return d; });
 
+  // On a quotation the terms and the "valid until" date are independent: the
+  // terms describe the future invoice, the date is how long the offer stands.
+  const isQuote = (d) => d.kind === 'quotation';
   const setIssueDate = (v) => update((d) => {
+    if (isQuote(d)) {
+      // Keep the same validity period when the quotation is re-dated.
+      const span = daysBetween(d.issueDate, d.dueDate);
+      d.issueDate = v;
+      if (span !== null && isValidISO(v)) d.dueDate = addDays(v, span);
+      return d;
+    }
     d.issueDate = v;
     const due = dueDateForTerms(v, d.terms);
     if (due) d.dueDate = due;
@@ -131,13 +147,27 @@ export default function EditorPage({ id }) {
   });
   const setTerms = (v) => update((d) => {
     d.terms = v;
-    const due = dueDateForTerms(d.issueDate, v);
+    const due = isQuote(d) ? null : dueDateForTerms(d.issueDate, v);
     if (due) d.dueDate = due;
     if (v === 'custom' && !d.customTerms) d.customTerms = '';
     return d;
   });
+  const setKind = (k) => update((d) => {
+    if ((d.kind ?? 'invoice') === k) return d;
+    d.kind = k;
+    if (k === 'quotation') {
+      d.dueDate = addDays(d.issueDate, DEFAULT_QUOTE_VALIDITY) || d.dueDate;
+      // The auto-written "due by date" text means nothing on a quotation.
+      if (d.terms === 'custom' && d.customTerms === 'Due by date shown') d.customTerms = '';
+    } else {
+      const due = dueDateForTerms(d.issueDate, d.terms);
+      if (due) d.dueDate = due;
+    }
+    return d;
+  });
   const setDueDate = (v) => update((d) => {
     d.dueDate = v;
+    if (isQuote(d)) return d;
     // Keep the printed terms honest when the due date is edited by hand.
     const preset = PAYMENT_TERMS.find((t) => t.days !== null && addDays(d.issueDate, t.days) === v);
     if (preset) d.terms = preset.value;
@@ -328,7 +358,7 @@ export default function EditorPage({ id }) {
             <div className="section-head"><h2>Invoice</h2></div>
             <div className="chips adv-presets" role="group" aria-label="Document type">
               {[['invoice', 'Invoice'], ['quotation', 'Quotation']].map(([k, label]) => (
-                <button key={k} type="button" className="chip" aria-pressed={(draft.kind ?? 'invoice') === k} onClick={() => setField('kind', k)}>{label}</button>
+                <button key={k} type="button" className="chip" aria-pressed={(draft.kind ?? 'invoice') === k} onClick={() => setKind(k)}>{label}</button>
               ))}
             </div>
             <div className="grid grid-2">
@@ -352,16 +382,27 @@ export default function EditorPage({ id }) {
               <Field label="Issue date" type="date" value={draft.issueDate} onChange={(e) => setIssueDate(e.target.value)} />
               <Field label="Payment terms">
                 <select value={draft.terms} onChange={(e) => setTerms(e.target.value)}>
-                  {PAYMENT_TERMS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {PAYMENT_TERMS.map((t) => <option key={t.value} value={t.value}>{termLabelFor(t, draft.kind === 'quotation')}</option>)}
                 </select>
               </Field>
               <Field
-                label="Due date"
+                label={draft.kind === 'quotation' ? 'Valid until' : 'Due date'}
                 type="date"
                 value={draft.dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                error={isValidISO(draft.dueDate) && draft.dueDate < draft.issueDate ? 'Due date is before the issue date' : null}
+                hint={draft.kind === 'quotation' ? 'How long this quotation’s prices stand' : undefined}
+                error={isValidISO(draft.dueDate) && draft.dueDate < draft.issueDate
+                  ? `${draft.kind === 'quotation' ? 'Validity date' : 'Due date'} is before the issue date` : null}
               />
+              {draft.kind === 'quotation' && (
+                <div className="chips" role="group" aria-label="Quotation validity" style={{ alignSelf: 'end', paddingBottom: 6 }}>
+                  {QUOTE_VALIDITY_DAYS.map((n) => (
+                    <button key={n} type="button" className="chip"
+                      aria-pressed={daysBetween(draft.issueDate, draft.dueDate) === n}
+                      onClick={() => setDueDate(addDays(draft.issueDate, n))}>{n} days</button>
+                  ))}
+                </div>
+              )}
               {draft.terms === 'custom' && (
                 <Field label="Custom terms text" value={draft.customTerms} onChange={(e) => setField('customTerms', e.target.value)} placeholder="e.g. 50% upfront, 50% on delivery" />
               )}
@@ -581,6 +622,7 @@ function Advance({ draft, totals, update, setDueDate }) {
   const error = totals.errors.advance;
   const money = (v) => formatMoney(v, draft.currency);
   const shown = totals.advance > 0;
+  const quote = draft.kind === 'quotation';
 
   return (
     <section className="section">
@@ -616,10 +658,12 @@ function Advance({ draft, totals, update, setDueDate }) {
                 onChange={(e) => set('date', e.target.value)}
                 error={!isValidISO(adv.date) ? 'Pick a date'
                   : adv.date < draft.issueDate ? 'Before the issue date'
-                    : isValidISO(draft.dueDate) && adv.date > draft.dueDate ? 'After the final payment date' : null} />
+                    : !quote && isValidISO(draft.dueDate) && adv.date > draft.dueDate ? 'After the final payment date' : null} />
             )}
-            <Field label="Final payment due date" type="date" value={draft.dueDate} min={adv.when === 'date' ? adv.date || draft.issueDate : draft.issueDate}
-              onChange={(e) => setDueDate(e.target.value)} hint="Same as the invoice due date" />
+            {!quote && (
+              <Field label="Final payment due date" type="date" value={draft.dueDate} min={adv.when === 'date' ? adv.date || draft.issueDate : draft.issueDate}
+                onChange={(e) => setDueDate(e.target.value)} hint="Same as the invoice due date" />
+            )}
           </div>
 
           {shown && (
@@ -646,7 +690,7 @@ function Advance({ draft, totals, update, setDueDate }) {
                   <span className="adv-tag">02 · Final {formatDecimal(String(totals.finalPercent))}%</span>
                   <strong>{money(totals.finalPayment)}</strong>
                   <small>{totals.finalPaid >= totals.finalPayment && totals.finalPayment > 0 ? 'Received ✓'
-                    : draft.dueDate ? `Due by ${formatDate(draft.dueDate)}` : 'Due on completion'}</small>
+                    : !quote && draft.dueDate ? `Due by ${formatDate(draft.dueDate)}` : 'Due on completion'}</small>
                 </div>
               </div>
             </div>
