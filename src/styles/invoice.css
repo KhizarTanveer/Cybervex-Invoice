@@ -158,7 +158,7 @@
 }
 .iv-tag i { flex: none; width: 1.3mm; height: 1.3mm; border-radius: 50%; }
 .iv-tag-once { color: var(--iv-ink); background: #fff; }
-.iv-tag-once i { border: 0.75pt solid var(--iv-ink); }
+.iv-tag-once i { background: var(--iv-ink); }
 .iv-tag-monthly { color: #fff; background: var(--iv-ink); }
 .iv-tag-monthly i { background: #fff; }
 .iv-services .iv-svc-items { margin-top: 1.2mm; display: grid; gap: 0.6mm; }

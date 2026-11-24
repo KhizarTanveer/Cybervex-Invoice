@@ -113,7 +113,7 @@ const s = StyleSheet.create({
     backgroundColor: '#fff',
   },
   tagSolid: { backgroundColor: INK },
-  tagDotRing: { width: 1.3 * MM, height: 1.3 * MM, borderRadius: 999, borderWidth: 0.75, borderColor: INK, marginRight: 1.3 * MM },
+  tagDotRing: { width: 1.3 * MM, height: 1.3 * MM, borderRadius: 999, backgroundColor: INK, marginRight: 1.3 * MM },
   tagDotSolid: { width: 1.3 * MM, height: 1.3 * MM, borderRadius: 999, backgroundColor: '#fff', marginRight: 1.3 * MM },
   tagText: { fontSize: 5.6, lineHeight: 1, fontWeight: 600, letterSpacing: 1.1, color: INK },
   svcItem: { flexDirection: 'row', marginTop: 1.4 },
