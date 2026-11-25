@@ -192,15 +192,17 @@ describe('pending payments', () => {
     expect(v.services[0].billing).toBeUndefined();
   });
 
-  it('labels a service one-time or monthly, with a monthly price per month', async () => {
+  it('labels a service one-time, monthly or yearly, with a recurring price per period', async () => {
     const { buildView } = await import('./view');
     const base = { currency: 'USD', budget: '', taxes: [], charges: [], from: {}, to: {}, state: 'draft', discount: { type: 'percent', value: '' }, payments: [] };
     const v = buildView({ ...base, services: [
       { id: 'a', name: 'Website', billing: 'once', price: '800' },
       { id: 'b', name: 'SEO', billing: 'monthly', price: '200' },
+      { id: 'c', name: 'Hosting', billing: 'yearly', price: '120' },
     ] }, {});
     expect(v.services[0]).toMatchObject({ billing: { kind: 'once', label: 'One-time' }, price: '$800' });
     expect(v.services[1]).toMatchObject({ billing: { kind: 'monthly', label: 'Monthly' }, price: '$200', per: '/ month' });
+    expect(v.services[2]).toMatchObject({ billing: { kind: 'yearly', label: 'Yearly' }, price: '$120', per: '/ year' });
   });
 
   it('treats a quotation date as validity, not a payment deadline', async () => {

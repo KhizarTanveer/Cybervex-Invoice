@@ -137,7 +137,7 @@
 }
 
 .iv-svc-body { flex: 1; min-width: 0; }
-/* Billing tag beside a service name: outlined for one-time, solid ink for monthly. */
+/* Billing tag beside a service name: outlined for one-time, solid ink for monthly or yearly. */
 .iv-tag {
   display: inline-flex;
   align-items: center;
@@ -159,8 +159,8 @@
 .iv-tag i { flex: none; width: 1.3mm; height: 1.3mm; border-radius: 50%; }
 .iv-tag-once { color: var(--iv-ink); background: #fff; }
 .iv-tag-once i { background: var(--iv-ink); }
-.iv-tag-monthly { color: #fff; background: var(--iv-ink); }
-.iv-tag-monthly i { background: #fff; }
+.iv-tag-monthly, .iv-tag-yearly { color: #fff; background: var(--iv-ink); }
+.iv-tag-monthly i, .iv-tag-yearly i { background: #fff; }
 .iv-services .iv-svc-items { margin-top: 1.2mm; display: grid; gap: 0.6mm; }
 .iv-svc-items li {
   position: relative;

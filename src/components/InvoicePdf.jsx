@@ -99,7 +99,7 @@ const s = StyleSheet.create({
   svcBody: { flex: 1 },
   svcHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   svcName: { color: INK, fontWeight: 500 },
-  // Billing tag: outlined for one-time, solid ink for monthly (matches the on-screen document).
+  // Billing tag: outlined for one-time, solid ink for monthly or yearly (matches the on-screen document).
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -310,9 +310,9 @@ export function InvoicePdfDocument({ view }) {
               <View style={s.svcHead}>
                 <P part={sv} style={s.svcName} />
                 {sv.billing ? (
-                  <View style={[s.tag, sv.billing.kind === 'monthly' ? s.tagSolid : null]}>
-                    <View style={sv.billing.kind === 'monthly' ? s.tagDotSolid : s.tagDotRing} />
-                    <Text style={[s.tagText, sv.billing.kind === 'monthly' ? { color: '#fff' } : null]}>{sv.billing.label.toUpperCase()}</Text>
+                  <View style={[s.tag, sv.billing.kind !== 'once' ? s.tagSolid : null]}>
+                    <View style={sv.billing.kind !== 'once' ? s.tagDotSolid : s.tagDotRing} />
+                    <Text style={[s.tagText, sv.billing.kind !== 'once' ? { color: '#fff' } : null]}>{sv.billing.label.toUpperCase()}</Text>
                   </View>
                 ) : null}
               </View>

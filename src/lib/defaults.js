@@ -34,7 +34,8 @@ export const DEFAULT_SETTINGS = {
 export const emptyService = () => ({ id: uid(), name: '' });
 
 /** How a service is billed; shown beside its name on the document. Unset shows nothing. */
-export const BILLING = { once: 'One-time', monthly: 'Monthly' };
+export const BILLING = { once: 'One-time', monthly: 'Monthly', yearly: 'Yearly' };
+export const BILLING_PER = { monthly: '/ month', yearly: '/ year' };
 
 /**
  * Upgrade invoices saved by earlier versions:
