@@ -63,6 +63,7 @@ export function buildView(invoice, settings, today, { balance = false } = {}) {
       text: sv.name.trim(),
       items: (sv.items ?? []).map((it) => it.text?.trim()).filter(Boolean),
       ...(BILLING[sv.billing] ? { billing: { kind: sv.billing, label: BILLING[sv.billing] } } : {}),
+      ...(sv.billing === 'custom' && sv.billingLabel?.trim() ? { billing: { kind: 'custom', label: sv.billingLabel.trim() } } : {}),
       ...(totals.services[sv.id] > 0
         ? { price: money(totals.services[sv.id]), ...(BILLING_PER[sv.billing] ? { per: BILLING_PER[sv.billing] } : {}) }
         : {}),

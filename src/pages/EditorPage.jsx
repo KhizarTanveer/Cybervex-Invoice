@@ -428,9 +428,14 @@ export default function EditorPage({ id }) {
                   <select value={sv.billing ?? ''} onChange={(e) => setListItem('services', sv.id, 'billing', e.target.value)}>
                     <option value="">Not shown</option>
                     {Object.entries(BILLING).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                    <option value="custom">Custom…</option>
                   </select>
                 </Field>
                 <button type="button" className="icon-btn" aria-label={`Remove service ${i + 1}`} onClick={() => removeListItem('services', sv.id)}><X /></button>
+                {sv.billing === 'custom' && (
+                  <Field className="svc-custom" label="Custom billing label" value={sv.billingLabel ?? ''} placeholder="e.g. Quarterly, Per hour, Per project"
+                    autoFocus={!sv.billingLabel} onChange={(e) => setListItem('services', sv.id, 'billingLabel', e.target.value)} />
+                )}
                 <ServiceItems sv={sv} n={i + 1} onChange={(items) => setListItem('services', sv.id, 'items', items)} />
               </div>
             ))}

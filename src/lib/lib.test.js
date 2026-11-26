@@ -205,6 +205,18 @@ describe('pending payments', () => {
     expect(v.services[2]).toMatchObject({ billing: { kind: 'yearly', label: 'Yearly' }, price: '$120', per: '/ year' });
   });
 
+  it('shows a custom billing label as typed, and nothing while it is blank', async () => {
+    const { buildView } = await import('./view');
+    const base = { currency: 'USD', budget: '', taxes: [], charges: [], from: {}, to: {}, state: 'draft', discount: { type: 'percent', value: '' }, payments: [] };
+    const v = buildView({ ...base, services: [
+      { id: 'a', name: 'Support', billing: 'custom', billingLabel: ' Quarterly ', price: '300' },
+      { id: 'b', name: 'Audit', billing: 'custom', billingLabel: '' },
+    ] }, {});
+    expect(v.services[0]).toMatchObject({ billing: { kind: 'custom', label: 'Quarterly' }, price: '$300' });
+    expect(v.services[0].per).toBeUndefined();
+    expect(v.services[1].billing).toBeUndefined();
+  });
+
   it('treats a quotation date as validity, not a payment deadline', async () => {
     const { buildView } = await import('./view');
     const q = { currency: 'USD', budget: '1000', services: [], taxes: [], charges: [], from: {}, to: {}, state: 'issued', kind: 'quotation', terms: 'net15', issueDate: '2026-11-01', dueDate: '2026-11-16', discount: { type: 'percent', value: '' }, payments: [] };

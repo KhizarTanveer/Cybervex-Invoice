@@ -256,6 +256,7 @@ a.list-row:hover { background: #fbfbfa; }
 
 .sub-row { display: grid; grid-template-columns: 1fr 120px 32px; gap: 10px; align-items: end; margin-bottom: 10px; }
 .service-row { grid-template-columns: 1fr 130px 32px; }
+.svc-custom { grid-column: 1 / -1; }
 .svc-items { grid-column: 1 / -1; display: grid; gap: 6px; justify-items: start; padding-left: 14px; border-left: 2px solid var(--line-strong); margin: 2px 0 8px; }
 .svc-items-label { font-size: 12px; color: var(--muted); }
 .svc-item { display: grid; grid-template-columns: 1fr 32px; gap: 8px; align-items: center; width: 100%; }
