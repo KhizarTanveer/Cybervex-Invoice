@@ -40,6 +40,13 @@ export function isDuplicateNumber(number, invoices, excludeId) {
 }
 
 /** Counter update after saving `number`: keeps the series high-water mark. */
+/** Combine two counter sets, keeping the highest number used for each prefix and year. */
+export function mergeCounters(a = {}, b = {}) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b ?? {})) out[k] = Math.max(out[k] ?? 0, Number(v) || 0);
+  return out;
+}
+
 export function bumpCounters(counters, number) {
   const m = /^([A-Z0-9]+-\d{4})-(\d+)$/.exec(normalizeNumber(number));
   if (!m) return counters;

@@ -20,6 +20,16 @@ export default function SettingsPage() {
   const dirty = JSON.stringify(form) !== baseline;
 
   useEffect(() => {
+    if (dirty) return;
+    const latest = JSON.stringify(settings);
+    if (latest !== baseline) {
+      setForm(structuredClone(settings));
+      setBaseline(latest);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  useEffect(() => {
     if (!dirty) return undefined;
     setNavigationGuard(() => window.confirm('You have unsaved settings. Leave without saving?'));
     return () => setNavigationGuard(null);

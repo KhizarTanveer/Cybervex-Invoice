@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { bumpCounters } from './numbering';
+import { bumpCounters, mergeCounters } from './numbering';
 import { supabase } from './supabase';
 import { KEYS, exportBackup, getState, replaceAll, setChangeHook } from './storage';
 
@@ -12,6 +12,8 @@ const QUEUE_KEY = 'cybervex-invoice:v1:sync-queue';
 const USER_KEY = 'cybervex-invoice:v1:sync-user';
 // A full backup taken just before the first upload from this browser. Never removed automatically.
 export const PRE_SYNC_KEY = 'cybervex-invoice:v1:pre-sync-backup';
+// Set on the first sign-in in a browser until we know whether the account already has settings.
+const SEED_KEY = 'cybervex-invoice:v1:settings-seed';
 const FOCUS_REFRESH_MS = 30_000;
 
 export const syncEnabled = !!supabase;
@@ -24,7 +26,10 @@ const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); }
 export const useSync = () => useSyncExternalStore(subscribe, () => auth);
 
 // ---- queue -----------------------------------------------------------------
-const emptyQueue = () => ({ invoices: [], deleted: [], settings: false });
+// `settings`: the user saved the Settings form (or imported a backup), so this
+// browser's settings are uploaded. `counters`: only invoice numbers moved on; the
+// saved settings are kept and just the counters are merged into them.
+const emptyQueue = () => ({ invoices: [], deleted: [], settings: false, counters: false });
 function readQueue() {
   try { return { ...emptyQueue(), ...JSON.parse(localStorage.getItem(QUEUE_KEY)) }; } catch { return emptyQueue(); }
 }
@@ -33,20 +38,30 @@ function writeQueue(q) {
 }
 export const pendingCount = () => {
   const q = readQueue();
-  return q.invoices.length + q.deleted.length + (q.settings ? 1 : 0);
+  return q.invoices.length + q.deleted.length + (q.settings || q.counters ? 1 : 0);
 };
 
-function enqueue({ invoices = [], deleted = [], settings = false }) {
+function enqueue({ invoices = [], deleted = [], settings = false, counters = false }) {
   const q = readQueue();
   const del = new Set(deleted);
   q.invoices = [...new Set([...q.invoices.filter((id) => !del.has(id)), ...invoices])];
   q.deleted = [...new Set([...q.deleted, ...deleted])];
   q.settings = q.settings || settings;
+  q.counters = q.counters || counters;
   writeQueue(q);
 }
 
 // ---- upload / download -----------------------------------------------------
 let running = null;
+
+/** First sign-in in this browser: upload its settings only when the account has none saved. */
+async function seedSettings() {
+  if (!localStorage.getItem(SEED_KEY)) return;
+  const { data, error } = await supabase.from('cybervex_settings').select('user_id').maybeSingle();
+  if (error) throw error;
+  if (!data) enqueue({ settings: true });
+  localStorage.removeItem(SEED_KEY);
+}
 
 async function flush() {
   const q = readQueue();
@@ -65,9 +80,15 @@ async function flush() {
     const { error } = await supabase.from('cybervex_invoices').delete().in('id', q.deleted);
     if (error) throw error;
   }
-  if (q.settings) {
+  if (q.settings || q.counters) {
+    const { data: saved, error: readError } = await supabase.from('cybervex_settings').select('data').maybeSingle();
+    if (readError) throw readError;
+    // Only an explicit save replaces the saved settings. Otherwise the account's
+    // settings stay exactly as they are and only the invoice counters move on.
+    const base = q.settings || !saved ? settings : saved.data;
+    const data = { ...base, counters: mergeCounters(saved?.data?.counters, settings.counters) };
     const { error } = await supabase.from('cybervex_settings')
-      .upsert({ user_id: auth.session.user.id, data: settings, updated_at: new Date().toISOString() });
+      .upsert({ user_id: auth.session.user.id, data, updated_at: new Date().toISOString() });
     if (error) throw error;
   }
 
@@ -82,6 +103,7 @@ async function flush() {
     invoices: now.invoices.filter((id) => !(q.invoices.includes(id) && (!sent.has(id) || sent.get(id) === current.get(id)))),
     deleted: now.deleted.filter((id) => !gone.has(id)),
     settings: now.settings && (!q.settings || after.settings !== settings),
+    counters: now.counters && (!(q.settings || q.counters) || after.settings !== settings),
   });
 }
 
@@ -102,7 +124,7 @@ async function pull() {
   const invoices = [...local.invoices.filter((i) => keep.has(i.id)), ...remote];
 
   const base = q.settings || !set.data ? local.settings : set.data.data;
-  let counters = { ...local.settings.counters, ...base.counters };
+  let counters = mergeCounters(local.settings.counters, base.counters);
   for (const i of invoices) counters = bumpCounters(counters, i.number);
   replaceAll({ invoices, settings: { ...base, counters } });
 }
@@ -114,6 +136,7 @@ export function syncNow() {
   setAuth({ status: 'syncing', error: '' });
   running = (async () => {
     try {
+      await seedSettings();
       await flush();
       await pull();
       setAuth({ status: 'synced', loaded: true, lastSync: Date.now() });
@@ -144,11 +167,15 @@ function onSignedIn(session) {
     // First sign-in on this browser: keep a copy of what is here, then upload it all.
     const { invoices } = getState();
     try {
-      if (!localStorage.getItem(PRE_SYNC_KEY) && invoices.length) {
+      if (!localStorage.getItem(PRE_SYNC_KEY)) {
         localStorage.setItem(PRE_SYNC_KEY, exportBackup());
       }
     } catch { /* storage full: the upload below still keeps the data */ }
-    enqueue({ invoices: invoices.map((i) => i.id), settings: true });
+    // Invoices are only ever added, so uploading them is safe. Settings are one
+    // record per account: this browser's copy is uploaded only if the account
+    // has none yet, so a new laptop never overwrites the saved settings.
+    enqueue({ invoices: invoices.map((i) => i.id) });
+    localStorage.setItem(SEED_KEY, '1');
   } else if (last !== uid) {
     // A different account: never mix its data with the previous one.
     writeQueue(emptyQueue());
@@ -174,6 +201,7 @@ export async function signOut() {
   setAuth({ session: null, status: 'idle', loaded: false });
   writeQueue(emptyQueue());
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(SEED_KEY);
   replaceAll({ invoices: [], settings: {} });
   try { localStorage.removeItem(KEYS.invoices); localStorage.removeItem(KEYS.settings); } catch { /* ignore */ }
 }

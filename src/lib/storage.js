@@ -86,7 +86,7 @@ export function saveInvoice(invoice) {
   write(KEYS.invoices, nextInvoices);
   write(KEYS.settings, nextSettings);
   setState({ invoices: nextInvoices, settings: nextSettings });
-  onChange({ invoices: [saved.id], settings: true });
+  onChange({ invoices: [saved.id], counters: true });
   return saved;
 }
 
@@ -155,6 +155,6 @@ export function importBackup(json) {
   write(KEYS.invoices, invoices);
   write(KEYS.settings, settings);
   setState({ invoices, settings });
-  onChange({ invoices: invoices.map((i) => i.id), settings: true });
+  onChange({ invoices: invoices.map((i) => i.id), ...(data.settings ? { settings: true } : { counters: true }) });
   return { imported: data.invoices.length - skipped, skipped };
 }
