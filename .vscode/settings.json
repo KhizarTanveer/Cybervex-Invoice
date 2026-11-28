@@ -1,0 +1,4 @@
+{
+  // Supabase Edge Functions run on Deno; check only that folder with the Deno language server.
+  "deno.enablePaths": ["supabase/functions"]
+}

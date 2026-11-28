@@ -174,7 +174,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .list { border-top: 1px solid var(--ink); }
 .list-row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1.6fr) 110px 110px 130px 130px 130px 40px;
+  grid-template-columns: 150px minmax(0, 1.6fr) 110px 110px 130px 130px 130px 116px 24px;
   align-items: center; gap: 12px;
   padding: 14px 4px; border-bottom: 1px solid var(--line);
   text-decoration: none; color: inherit;
@@ -186,6 +186,8 @@ a.list-row:hover { background: #fbfbfa; }
 .list-row .sub { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-row .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list-row .mobile-label { display: none; }
+.list-row .mail-cell { display: flex; justify-content: flex-end; }
+.list-row .mail-cell svg { width: 14px; height: 14px; }
 .empty { padding: 72px 20px; text-align: center; color: var(--muted); border-bottom: 1px solid var(--line); }
 .empty h2 { font-size: 17px; color: var(--ink); font-weight: 600; margin-bottom: 6px; }
 .empty .btn { margin-top: 18px; }
@@ -356,6 +358,21 @@ a.list-row:hover { background: #fbfbfa; }
 .menu-pop svg { width: 15px; height: 15px; }
 .menu-pop hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
 
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px;
+  background: rgba(10, 10, 10, 0.4);
+}
+.modal {
+  width: 100%; max-width: 460px; background: var(--white); border-radius: 8px; padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.modal h2 { font-size: 17px; font-weight: 600; color: var(--ink); margin-bottom: 16px; }
+.modal .modal-field { margin-top: 14px; }
+.modal-note { margin-top: 12px; }
+.modal-error { margin-top: 12px; padding: 8px 10px; border-radius: var(--radius); background: rgba(180, 35, 24, 0.08); color: var(--danger); font-size: 13px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
 .toast {
   position: fixed; left: 50%; bottom: 24px; translate: -50% 0; z-index: 50;
   background: var(--ink); color: var(--white); padding: 10px 16px; border-radius: var(--radius);
@@ -390,7 +407,7 @@ a.list-row:hover { background: #fbfbfa; }
   .list-head { display: none !important; }
   .list-row {
     grid-template-columns: 1fr auto;
-    grid-template-areas: 'num status' 'client total' 'dates balance';
+    grid-template-areas: 'num status' 'client total' 'dates balance' 'mail mail';
     row-gap: 4px; padding: 14px 4px;
   }
   .list-row > :nth-child(1) { grid-area: num; }
@@ -400,7 +417,8 @@ a.list-row:hover { background: #fbfbfa; }
   .list-row > :nth-child(5) { grid-area: total; }
   .list-row > :nth-child(6) { grid-area: balance; }
   .list-row > :nth-child(7) { grid-area: status; justify-self: end; }
-  .list-row > :nth-child(8) { display: none; }
+  .list-row > :nth-child(8) { grid-area: mail; justify-content: flex-start; margin-top: 6px; }
+  .list-row > :nth-child(9) { display: none; }
   .list-row .mobile-label { display: inline; color: var(--muted); font-size: 12px; margin-right: 6px; }
 }
 

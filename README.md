@@ -66,6 +66,23 @@ The first sign-in on a browser uploads the invoices already stored there.
 
 Leave the variables empty to run local-only.
 
+## Email (Send mail)
+
+**Send mail** on the dashboard emails the invoice or quotation PDF to the client through the
+Titan mailbox (`smtp.titan.email`, port 465). The sending runs in the Supabase Edge Function
+[`supabase/functions/send-email`](supabase/functions/send-email/index.ts). The SMTP password is kept
+in that function's secrets and never reaches the browser. Only signed-in users can send.
+
+1. **Supabase → Edge Functions → Secrets**: add `SMTP_USER` (the mailbox address) and `SMTP_PASS`.
+   Optional: `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM_NAME` (defaults: `smtp.titan.email`, `465`, `Cybervex Digital`).
+2. Deploy the function, either from the dashboard (**Edge Functions → Deploy a new function**, name it
+   `send-email`, paste `index.ts`) or with the CLI:
+   ```bash
+   npx supabase login
+   npx supabase functions deploy send-email --project-ref <your-project-ref>
+   ```
+Never put the SMTP password in `.env` or any `VITE_` variable: those are bundled into the browser.
+
 ## Assets
 
 - `public/brand/cybervex-logo-silver.png`: the official logo from the company website project, trimmed.

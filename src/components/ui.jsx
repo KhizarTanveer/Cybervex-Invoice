@@ -75,6 +75,24 @@ export function Menu({ label, icon, children }) {
   );
 }
 
+/** A centred dialog over a dimmed backdrop; Escape or a backdrop click closes it. */
+export function Modal({ title, onClose, children }) {
+  const titleId = useId();
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <h2 id={titleId}>{title}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** Scales an A4 page down to fit its container without affecting layout or print. */
 export function ScaledPreview({ children }) {
   const outer = useRef();
