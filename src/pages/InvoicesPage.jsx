@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import {
-  TriangleAlert, CircleCheck, Clock, FileText, LoaderCircle, Mail, Paperclip, Plus, Receipt, Search, Send,
+  TriangleAlert, CircleCheck, Clock, Download, FileText, LoaderCircle, Mail, Paperclip, Plus, Receipt, Search, Send,
 } from 'lucide-react';
 import { computeTotals } from '../lib/calc';
 import { daysBetween, formatDate, todayISO } from '../lib/dates';
@@ -9,6 +9,7 @@ import { navigate } from '../lib/router';
 import { STATUS, deriveStatus, pendingPayment } from '../lib/status';
 import { useStore } from '../lib/storage';
 import { pdfFilename, sendInvoiceEmail } from '../lib/email';
+import { buildView } from '../lib/view';
 import { Modal, StatusBadge, useToast } from '../components/ui';
 import RevenueChart from '../components/RevenueChart';
 
@@ -198,7 +199,7 @@ function dueNote(inv, status, today) {
 }
 
 /** One invoice or quotation in the history ledger. The whole row opens it. */
-function HistoryRow({ inv, totals, status, today, onMail }) {
+function HistoryRow({ inv, totals, status, today, onMail, onDownload, downloading }) {
   const href = `#/invoice/${inv.id}`;
   const services = (inv.services ?? []).map((sv) => sv.name?.trim()).filter(Boolean).join(', ');
   const note = dueNote(inv, status, today);
@@ -239,6 +240,16 @@ function HistoryRow({ inv, totals, status, today, onMail }) {
       </span>
       <span role="cell" className="cell-status"><StatusBadge status={status} /></span>
       <span role="cell" className="cell-actions">
+        <button
+          type="button"
+          className="row-icon-btn"
+          onClick={onDownload}
+          disabled={downloading}
+          aria-label={`Download ${inv.number || 'document'} as PDF`}
+          title="Download PDF"
+        >
+          {downloading ? <LoaderCircle className="spin" aria-hidden /> : <Download aria-hidden />}
+        </button>
         <button type="button" className="send-btn" onClick={onMail} aria-label={`Email ${inv.number || 'document'}`}>
           <Mail aria-hidden /><span>Send</span>
         </button>
@@ -271,6 +282,28 @@ export default function InvoicesPage() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [mailing, setMailing] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const downloadPdf = async (inv) => {
+    setDownloadingId(inv.id);
+    try {
+      const { renderInvoicePdf } = await import('../components/InvoicePdf');
+      const blob = await renderInvoicePdf(buildView(inv, settings));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pdfFilename(inv);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      console.error(e);
+      showToast('Could not create the PDF. Please try again.', 'error');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
   const [toast, showToast] = useToast();
 
   const rows = useMemo(() => {
@@ -426,7 +459,8 @@ export default function InvoicesPage() {
           </div>
 
           {visible.map(({ inv, totals, status }) => (
-            <HistoryRow key={inv.id} inv={inv} totals={totals} status={status} today={today} onMail={() => setMailing(inv)} />
+            <HistoryRow key={inv.id} inv={inv} totals={totals} status={status} today={today} onMail={() => setMailing(inv)}
+              onDownload={() => downloadPdf(inv)} downloading={downloadingId === inv.id} />
           ))}
 
           {rows.length === 0 && (

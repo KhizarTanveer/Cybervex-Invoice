@@ -318,7 +318,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .ledger-row {
   position: relative; display: grid; align-items: center; gap: 16px;
-  grid-template-columns: 148px minmax(0, 1fr) 96px 120px 124px 104px 140px 72px;
+  grid-template-columns: 148px minmax(0, 1fr) 96px 120px 124px 104px 140px 108px;
   padding: 12px 20px; border-bottom: 1px solid var(--line);
 }
 .ledger-row:last-child { border-bottom: 0; border-radius: 0 0 12px 12px; }
@@ -364,7 +364,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .ledger .badge-draft::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
 
 /* Send sits above the row link so it can be clicked on its own. */
-.cell-actions { position: relative; z-index: 1; display: flex; justify-content: flex-end; }
+.cell-actions { position: relative; z-index: 1; display: flex; justify-content: flex-end; gap: 4px; }
+.row-icon-btn {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; flex: none;
+  border: 1px solid transparent; border-radius: 8px; background: none; cursor: pointer; color: var(--muted);
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s, transform 0.12s;
+}
+.row-icon-btn svg { width: 16px; height: 16px; }
+.ledger-row:hover .row-icon-btn { color: var(--ink); border-color: var(--line-strong); background: var(--white); }
+.ledger-row .row-icon-btn:hover { border-color: var(--ink); }
+.row-icon-btn:active:not(:disabled) { transform: scale(0.97); }
+.row-icon-btn:disabled { cursor: progress; }
+.row-icon-btn:focus-visible { outline: none; color: var(--ink); box-shadow: var(--focus); border-color: var(--ink); }
 .send-btn {
   display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
   border: 1px solid transparent; border-radius: 8px; background: none; cursor: pointer;
@@ -752,7 +763,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .cell-status { grid-area: status; justify-self: end; }
   .cell-actions { grid-area: actions; }
   .ledger-row .mobile-label { display: inline; margin-right: 6px; font-size: 12px; color: var(--muted); }
-  .send-btn { color: var(--ink); border-color: var(--line-strong); }
+  .send-btn, .row-icon-btn { color: var(--ink); border-color: var(--line-strong); }
 }
 
 @media (max-width: 640px) {
