@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { STATUS } from '../lib/status';
 
 export function Field({ label, error, hint, className = '', children, ...props }) {
@@ -76,7 +77,7 @@ export function Menu({ label, icon, children }) {
 }
 
 /** A centred dialog over a dimmed backdrop; Escape or a backdrop click closes it. */
-export function Modal({ title, onClose, children }) {
+export function Modal({ title, subtitle, onClose, children, className = '' }) {
   const titleId = useId();
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') onClose(); };
@@ -85,8 +86,16 @@ export function Modal({ title, onClose, children }) {
   }, [onClose]);
   return (
     <div className="modal-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <h2 id={titleId}>{title}</h2>
+      <div className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="modal-head">
+          <div>
+            <h2 id={titleId}>{title}</h2>
+            {subtitle && <p className="modal-sub">{subtitle}</p>}
+          </div>
+          <button type="button" className="icon-btn modal-close" aria-label="Close" onClick={onClose}>
+            <X aria-hidden />
+          </button>
+        </div>
         {children}
       </div>
     </div>

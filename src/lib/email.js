@@ -16,6 +16,12 @@ function blobToBase64(blob) {
   });
 }
 
+/** The attachment's file name, e.g. "CVD-2026-0004 - Quotation - Acme Ltd.pdf". */
+export function pdfFilename(inv) {
+  const isQuote = inv.kind === 'quotation';
+  return `${safeFilename([inv.number, isQuote && 'Quotation', inv.to?.company].filter(Boolean).join(' - '))}.pdf`;
+}
+
 /** Renders the invoice or quotation as a PDF and emails it through the send-email function. */
 export async function sendInvoiceEmail(inv, settings, { to, subject }) {
   if (!supabase) throw new Error('Email needs cloud sync (Supabase) to be set up.');
@@ -42,7 +48,7 @@ export async function sendInvoiceEmail(inv, settings, { to, subject }) {
       to,
       subject,
       text,
-      filename: `${safeFilename([inv.number, isQuote && 'Quotation', inv.to?.company].filter(Boolean).join(' - '))}.pdf`,
+      filename: pdfFilename(inv),
       pdfBase64: await blobToBase64(blob),
     },
   });

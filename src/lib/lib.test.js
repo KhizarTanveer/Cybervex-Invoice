@@ -328,3 +328,59 @@ describe('invoice document', () => {
     expect(buildView({ ...base, state: 'issued', dueDate: '2999-01-01', payments: [{ id: 'p', amount: '40' }] }, {}).showStatus).toBe(true);
   });
 });
+
+describe('monthly revenue', () => {
+  it('lists the last months across a year boundary', async () => {
+    const { lastMonths } = await import('./revenue');
+    expect(lastMonths('2026-02-14', 4)).toEqual(['2025-11', '2025-12', '2026-01', '2026-02']);
+  });
+  it('counts every payment in the month it was received, advance first', async () => {
+    const { receivedByMonth } = await import('./revenue');
+    const issued = { state: 'issued', dueDate: '2999-01-01' };
+    const advance = { enabled: true, percent: '40', when: 'receipt' };
+    const list = [
+      // 40% advance in October, the rest in November
+      inv({ ...issued, budget: '1000', advance, payments: [{ id: 'a', date: '2026-10-20', amount: '400' }, { id: 'b', date: '2026-11-03', amount: '600' }] }),
+      // advance only, still open
+      inv({ ...issued, budget: '500', advance, payments: [{ id: 'c', date: '2026-11-10', amount: '200' }] }),
+      // part payment without an advance
+      inv({ ...issued, budget: '800', payments: [{ id: 'd', date: '2026-11-12', amount: '300' }] }),
+      inv({ ...issued, budget: '200', currency: 'EUR', payments: [{ id: 'e', date: '2026-09-01', amount: '200' }] }),
+      inv({ state: 'void', budget: '900', payments: [{ id: 'f', date: '2026-11-01', amount: '900' }] }),
+      inv({ state: 'draft', budget: '900', payments: [{ id: 'g', date: '2026-11-01', amount: '900' }] }),
+    ];
+    const r = receivedByMonth(list, '2026-11-28');
+    expect(r.get('USD').get('2026-10')).toEqual({ amount: 400, advance: 400, count: 1 });
+    expect(r.get('USD').get('2026-11')).toEqual({ amount: 1100, advance: 200, count: 3 });
+    expect(r.get('EUR').get('2026-09')).toEqual({ amount: 200, advance: 0, count: 1 });
+  });
+  it('builds the report: payments, clients and monthly totals for one currency', async () => {
+    const { revenueReport } = await import('./revenue');
+    const issued = { state: 'issued', dueDate: '2999-01-01' };
+    const advance = { enabled: true, percent: '40', when: 'receipt' };
+    const list = [
+      inv({ ...issued, number: 'A-1', to: { company: 'Acme', email: 'a@acme.test' }, budget: '1000', advance,
+        payments: [{ id: 'a', date: '2026-10-20', amount: '400', method: 'Wise' }, { id: 'b', date: '2026-11-03', amount: '600' }] }),
+      inv({ ...issued, number: 'A-2', to: { company: 'acme' }, budget: '500', payments: [] }),
+      inv({ ...issued, number: 'B-1', to: { company: 'Beta' }, budget: '300', payments: [{ id: 'c', date: '2025-01-05', amount: '300' }] }),
+      inv({ ...issued, number: 'E-1', currency: 'EUR', to: { company: 'Euro' }, budget: '200', payments: [{ id: 'd', date: '2026-11-01', amount: '200' }] }),
+    ];
+    const r = revenueReport(list, '2026-11-28', 'USD', ['2026-10', '2026-11']);
+    expect(r.total).toBe(1000);
+    expect(r.advances).toBe(400);
+    expect(r.payments.map((p) => [p.number, p.type, p.amount])).toEqual([['A-1', 'Balance', 600], ['A-1', 'Advance', 400]]);
+    expect(r.payments[1].method).toBe('Wise');
+    expect(r.clients).toEqual([{ company: 'Acme', contact: '', email: 'a@acme.test', documents: 2, payments: 2, received: 1000, outstanding: 500 }]);
+    expect(r.monthly).toEqual([
+      { key: '2026-10', amount: 400, advance: 400, payments: 1 },
+      { key: '2026-11', amount: 600, advance: 0, payments: 1 },
+    ]);
+  });
+  it('rounds the axis up to a readable maximum', async () => {
+    const { niceMax } = await import('./revenue');
+    expect(niceMax(0)).toBe(1);
+    expect(niceMax(1800)).toBe(2000);
+    expect(niceMax(2100)).toBe(2500);
+    expect(niceMax(7300)).toBe(10000);
+  });
+});
